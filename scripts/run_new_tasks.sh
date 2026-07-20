@@ -11,14 +11,15 @@
 #   - pip install timm torch torchvision Pillow numpy h5py
 
 set -e
-cd "$(dirname "$0")"
+# cd to repo root (one level up from scripts/)
+cd "$(dirname "$0")/.."
 
 MAX=500
 if [[ "$1" == "--smoke" ]]; then MAX=50; echo "[smoke mode] max_per_domain=$MAX"; fi
 
 echo "===  KADID-10k IQA (5 distortion-family domains)  ==="
 python run_iqa_cl.py \
-  --config domains_iqa_kadid.json \
+  --config configs/domains_iqa_kadid.json \
   --img-size 518 --backbone dinov2_vitb14 \
   --lam 1e2 --max-per-domain "$MAX" \
   --out runs_real/kadid
@@ -29,7 +30,7 @@ echo "===  NYU Depth V2 (3 acquisition-batch domains)  ==="
 # Here we run just the f=1 vs adaptive sweep via run_real_norm_ablation.py if available,
 # otherwise run a quick forward pass to verify loading.
 python run_adaptive_f.py \
-  --config domains_depth_nyu.json \
+  --config configs/domains_depth_nyu.json \
   --img-size 518 --backbone dinov2_vitb14 \
   --lam 1e2 --patch-target mean --alpha 0.25 \
   --max-per-domain "$MAX" \
@@ -39,7 +40,7 @@ python run_adaptive_f.py \
 echo ""
 echo "===  AVA Aesthetics 10% (3 score-tier domains)  ==="
 python run_ava_cl.py \
-  --config domains_ava.json \
+  --config configs/domains_ava.json \
   --img-size 518 --backbone dinov2_vitb14 \
   --lam 1e2 --max-per-domain "$MAX" \
   --out runs_real/ava
