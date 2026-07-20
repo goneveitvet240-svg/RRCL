@@ -1,0 +1,28 @@
+{
+  "domains": [
+    {
+      "name": "NYU-D0",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain0_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain0_test.txt",
+      "max_depth": 10.0
+    },
+    {
+      "name": "NYU-D1",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain1_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain1_test.txt",
+      "max_depth": 10.0
+    },
+    {
+      "name": "NYU-D2",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain2_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth/splits/domain2_test.txt",
+      "max_depth": 10.0
+    }
+  ]
+}

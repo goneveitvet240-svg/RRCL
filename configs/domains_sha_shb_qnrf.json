@@ -1,0 +1,25 @@
+{
+  "domains": [
+    {
+      "name": "SHA",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_A",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "SHB",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_B",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "QNRF",
+      "kind": "qnrf",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UCF_QNRF/UCF-QNRF_ECCV18",
+      "train_split": "Train",
+      "test_split": "Test"
+    }
+  ]
+}

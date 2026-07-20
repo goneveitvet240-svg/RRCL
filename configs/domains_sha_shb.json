@@ -1,0 +1,18 @@
+{
+  "domains": [
+    {
+      "name": "SHA",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_A",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "SHB",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_B",
+      "train_split": "train",
+      "test_split": "test"
+    }
+  ]
+}

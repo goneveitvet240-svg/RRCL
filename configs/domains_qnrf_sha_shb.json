@@ -1,0 +1,25 @@
+{
+  "domains": [
+    {
+      "name": "QNRF",
+      "kind": "qnrf",
+      "root": "/root/autodl-tmp/datasets/QNRF/UCF-QNRF_ECCV18",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "SHA",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_A",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "SHB",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_B",
+      "train_split": "train",
+      "test_split": "test"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "domains": [
+    {
+      "name": "SHA",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_A",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "JHU",
+      "kind": "jhu",
+      "root": "/root/autodl-tmp/datasets/JHU_official_download/jhu_crowd_v2.0",
+      "train_split": "train",
+      "test_split": "val"
+    },
+    {
+      "name": "SHB",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_B",
+      "train_split": "train",
+      "test_split": "test"
+    }
+  ]
+}

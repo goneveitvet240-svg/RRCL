@@ -1,0 +1,25 @@
+{
+  "domains": [
+    {
+      "name": "JHU",
+      "kind": "jhu",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/JHU_CROWD/jhu_crowd_v2.0/jhu_crowd_v2.0",
+      "train_split": "train",
+      "test_split": "val"
+    },
+    {
+      "name": "SHA",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_A",
+      "train_split": "train",
+      "test_split": "test"
+    },
+    {
+      "name": "SHB",
+      "kind": "shanghai",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_B",
+      "train_split": "train",
+      "test_split": "test"
+    }
+  ]
+}
