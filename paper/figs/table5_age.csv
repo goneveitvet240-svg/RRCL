@@ -1,0 +1,2 @@
+config,fstar_none,fstar_mean,f1_rel_mae,adaptive_rel_mae,f_used,improvement
+UTK-Young→Mid→Old,1.0,0.4,0.224,0.214,"[1.0,0.60,0.75]",+4.8%

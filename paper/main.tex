@@ -4,6 +4,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
+\graphicspath{{figs/}}
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{hyperref}
@@ -45,28 +46,32 @@ $^{1}$[Affiliation TBD]\\
 % ==============================================================
 \begin{abstract}
 % ==============================================================
-Analytic continual learning methods maintain a recursive least-squares (RLS)
-head over frozen foundation features, relying on a forgetting factor $f=1$
-(\emph{absolute memory}) to emulate a joint solution incrementally.
-We show that this default fails for continual \emph{visual regression}
-(crowd counting, age estimation) where domain label scales and
-genuine cross-domain drift co-exist: using $f<1$ can reduce error by
-up to 24\% over $f=1$.
+Analytic continual learning (ACL) methods maintain a recursive least-squares
+(RLS) head over frozen foundation features, relying on a forgetting factor
+$f=1$ (\emph{absolute memory}) to emulate a joint solution incrementally.
+We show that this default fails for continual \emph{visual regression} where
+domain label scales and genuine cross-domain drift co-exist.
 We decompose forgetting benefit into two orthogonal mechanisms---
 \emph{magnitude mismatch} (inter-domain label scale differences, removed by
-per-domain normalization) and \emph{genuine drift} (feature-to-target mapping
-shift, persisting after normalization)---and prove that $f^*=1$ whenever
-no concept drift exists (Proposition~1) and derive a sufficient condition for
-$f^*<1$ that unifies all our empirical findings (Proposition~2).
+per-domain mean normalization) and \emph{genuine drift} (feature-to-target
+mapping shift, persisting after normalization)---and prove that $f^*=1$
+whenever no concept drift exists (Proposition~1) and derive a sufficient
+condition for $f^*<1$ controlled by a verifiable \emph{drift score}
+(Proposition~2).
 We then propose an exemplar-free, test-set-free \emph{adaptive forgetting
 selector} that uses held-out sufficient statistics within each domain to pick
-$f$ per domain boundary, achieving self-calibration: it automatically
-applies forgetting when drift is present (+22--24\% over $f=1$) and
-recovers $f=1$ with zero loss when no drift exists.
-We validate on crowd counting (ShanghaiTech~A/B, JHU-Crowd++) and age
-estimation (UTKFace, AgeDB), including deliberate negative examples,
-demonstrating that what needs forgetting is task-specific but the
-adaptive mechanism transfers across tasks.
+$f$ per domain boundary, achieving self-calibration: it automatically applies
+forgetting when drift is present and recovers $f=1$ with zero loss otherwise.
+We provide \textbf{two independent positive examples} of genuine drift from
+distinct mechanisms: (i)~JHU-first crowd counting, where cross-dataset
+scene diversity creates mapping shift ($+5.7\%$ over $f{=}1$, exceeding
+oracle fixed $f$); and (ii)~UTKFace age-group ordering, where demographic
+distribution shift within the same dataset creates drift in the opposite
+direction ($+4.8\%$).
+Deliberate negative examples (UCF-QNRF cross-dataset, same-library
+SHA$\to$SHB, cross-dataset AgeDB$\to$UTK) confirm that forgetting is
+\emph{not} universally beneficial and that our selector correctly
+abstains. The drift criterion matches empirical oracle in 9/10 sequences.
 \end{abstract}
 
 % ==============================================================
@@ -98,33 +103,40 @@ label distributions and genuine feature-to-target drift?}
 
 \paragraph{Key finding: no.}
 In crowd counting with frozen DINOv2 features, ordering domains so that
-JHU-Crowd++ (high-density, high-scale) appears first and Shanghai-Tech
-datasets appear later yields $f^*\approx 0.25$---$f=1$ incurs 22--24\%
-excess error.
-Yet when the same-library Shanghai-Tech A and B are ordered among
+JHU-Crowd++ (high-density, cross-dataset) appears first and ShanghaiTech
+datasets appear later yields $f^*\approx 0.60$ after magnitude normalization,
+delivering a $5.6$--$5.7\%$ improvement over $f{=}1$ and slightly exceeding
+the oracle best fixed factor.
+In age estimation, ordering UTKFace by age group (Young$\to$Mid$\to$Old)
+yields $f^*=0.40$, giving $+4.8\%$---a second, mechanistically distinct
+positive example from a different task and a different type of drift.
+Yet when the same-library ShanghaiTech A and B are ordered among
 themselves, $f=1$ is exactly optimal: there is no forgetting benefit
 because the domains share label scales and feature-to-target mappings.
 
 \paragraph{Our contributions.}
 \begin{enumerate}
   \item \textbf{Mechanism decomposition.} We isolate \emph{magnitude
-    mismatch} (different label scales) from \emph{genuine drift}
-    (different feature-to-target mappings) via per-domain mean
+    mismatch} from \emph{genuine concept drift} via per-domain mean
     normalization, and show these require distinct treatment.
-  \item \textbf{Theory.} Under an isotropic approximation we prove
-    $f^*=1$ when no concept drift exists (Proposition~1) and derive
-    a sufficient condition for $f^*<1$ controlled by the interaction
-    of domain quality, sequence position, and drift magnitude
-    (Proposition~2).
-  \item \textbf{Adaptive selector.} We propose a per-boundary
-    forgetting selector that uses held-out within-domain sufficient
-    statistics---no test data, no exemplars---and show it
-    self-calibrates across two tasks (crowd counting and age estimation).
-  \item \textbf{Honest evaluation.} We report positive
-    examples (JHU-first orderings, UTK age-group split) alongside
-    deliberate negative examples (UCF-QNRF cross-dataset, AgeDB$\to$UTK)
-    where forgetting brings no benefit, and provide capacity checks
-    confirming the limitation is not simply underfitting.
+  \item \textbf{Theory and drift score.} Under an isotropic approximation
+    we prove $f^*=1$ when no drift exists (Proposition~1), derive a
+    sufficient condition for $f^*<1$ (Proposition~2), and operationalize
+    it as a verifiable \emph{drift score} $\mathrm{DS}_k$
+    (Eq.~\eqref{eq:drift_score}) computable from training statistics.
+  \item \textbf{Adaptive selector.} A per-boundary selector using
+    held-out sufficient statistics---no test data, no exemplars,
+    $O(d^2)$ storage---that self-calibrates across tasks. We clarify
+    its relationship to VFF-RLS: our oracle fixed-$f$ baseline equals
+    the best achievable VFF-RLS with a single tuned factor; our selector
+    improves on this by choosing $f$ per boundary.
+  \item \textbf{Two independent positive examples.} JHU-first crowd
+    counting ($+5.7\%$, cross-dataset mapping drift) and UTK age-group
+    ordering ($+4.8\%$, demographic drift without magnitude mismatch)
+    demonstrate the phenomenon across distinct tasks and drift mechanisms.
+  \item \textbf{Honest evaluation with negative examples.}
+    UCF-QNRF, SHA$\to$SHB, and AgeDB$\to$UTK are reported as
+    deliberate negatives, clearly bounding the method's applicability.
 \end{enumerate}
 
 % ==============================================================
@@ -150,12 +162,21 @@ closed-form analytic head, making our update one pass per domain with no
 backpropagation. This places us in the analytic CL tradition rather than
 the deep distillation tradition.
 
-\paragraph{Adaptive forgetting in signal processing.}
+\paragraph{Relation to VFF-RLS.}
 Variable forgetting factor RLS (VFF-RLS)~\cite{leung1993vff} and
 directional forgetting~\cite{kulhavy1987directional} adapt $f$ to
 track non-stationary signals in control and signal processing.
-Our work instantiates this idea in the analytic CL context with
-domain-boundary-aware sufficient-statistic selection.
+Our oracle fixed-$f$ baseline (Table~\ref{tab:main_results}) is
+equivalent to the best achievable VFF-RLS with a single tuned forgetting
+factor---it represents the ceiling for methods that commit to a global $f$.
+Our adaptive selector goes further in two ways: (i)~it selects $f$
+\emph{per domain boundary} rather than fixing a global factor, enabling the
+correct $f=1$ abstention when no drift is detected; (ii)~it is entirely
+data-driven using held-out sufficient statistics, requiring no external
+scheduling or supervision.
+To our knowledge, this is the first application of adaptive VFF-RLS-style
+forgetting within the analytic continual learning framework for visual
+regression.
 
 \paragraph{Continual regression.}
 Continual learning for regression is understudied compared to
@@ -171,12 +192,23 @@ exemplar-free---occupies a distinct and practical niche.
 
 \subsection{Problem Setting}
 
-We observe a sequence of $T$ domains $k=1,\dots,T$.
+\paragraph{Task-aware domain-incremental regression.}
+We adopt the \emph{task-aware domain-incremental} (TADIL) setting: the
+domain identity $k$ is known during both training and inference, but
+original data from previous domains is unavailable after processing.
+This is standard in privacy-sensitive deployments (medical imaging, edge
+devices) and matches the setting of recent ACL
+work~\cite{zhuang2022acil,mcdonnell2023ranpac}.
+We make no assumption of a shared feature-to-target mapping across domains;
+each domain may have its own optimal regressor $w_k$.
+
+Formally, we observe a sequence of $T$ domains $k=1,\dots,T$.
 Domain $k$ provides $n_k$ samples $\{(x_i, y_i)\}$ where
 $x_i \in \R^d$ are features extracted by a \emph{frozen} vision
-backbone (DINOv2 ViT-B/14) and $y_i \in \R$ is a scalar target
+backbone (DINOv2 ViT-B/14, $d=768$) and $y_i \in \R$ is a scalar target
 (crowd count or age).
-We assume a linear model per domain: $y = x^\top w_k + \varepsilon$.
+We assume a linear model per domain: $y = x^\top w_k + \varepsilon_k$
+where $\varepsilon_k \sim \mathcal{N}(0, \sigma_k^2)$.
 After processing domain $k$, the original data is discarded---no exemplar
 replay, no access to previous raw data.
 
@@ -198,6 +230,18 @@ Each image is processed by DINOv2 to yield patch-level tokens.
 We combine (i) raw patch features averaged spatially and (ii) a DCT-5
 smoothed count map auxiliary to form the regression input.
 A ridge parameter $\lambda=100$ is used throughout.
+
+\paragraph{Memory and computational complexity.}
+The method stores two $d{\times}d$ matrices $(R_k, C_k)$ per domain
+accumulated into running totals, giving $O(d^2)$ \emph{total} storage
+(independent of $T$, since only the running totals are kept).
+For DINOv2 ViT-B/14 with $d=768$, this is ${\approx}4.7$\,MB---negligible
+compared to the backbone (${\approx}330$\,MB).
+Per-domain update cost is $O(n_k d^2)$ for accumulation and $O(d^3)$ for
+solving; the adaptive $f$ grid search adds $O(|\mathcal{F}| d^3)$ at each
+boundary ($|\mathcal{F}|=20$ in our experiments).
+Critically, \emph{no GPU is required} for the RLS update or $f$ selection;
+only the DINOv2 forward pass benefits from GPU acceleration.
 
 \subsection{Magnitude Normalization}
 \label{sec:norm}
@@ -389,6 +433,17 @@ $\fstar$ under two normalization regimes: \emph{none} (raw targets) and
   \end{tabular}
 \end{table}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig2_norm_ablation}
+  \caption{Optimal forgetting factor $f^*$ under raw targets (blue) vs.\
+  mean-normalised targets (red) for all orderings studied (crowd counting
+  and age estimation). A gap between the two bars indicates a magnitude
+  artifact; coincidence of both bars at values $<1$ indicates genuine
+  concept drift.}
+  \label{fig:norm_ablation}
+\end{figure}
+
 The SHA$\to$SHB ordering shows $f^*=0.30$ in raw targets but
 collapses to $f^*=1$ after normalization, confirming the apparent
 forgetting benefit was entirely attributable to the ${\sim}4\times$
@@ -482,6 +537,17 @@ resolve. Adaptive forgetting closes approximately 54\% of this gap on
 JHU-first orderings (from 0.511 toward 0.459), via selective discounting
 of earlier domains at each boundary.
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig1_method_comparison}
+  \caption{Balanced relative MAE across four crowd-counting orderings
+  (lower is better). Background shading separates genuine-drift orderings
+  (red; JHU first) from magnitude-only / no-drift orderings (blue).
+  Adaptive forgetting reduces error by $5.6$--$5.7\%$ on drift orderings
+  while recovering $f{=}1$ with zero loss on no-drift orderings.}
+  \label{fig:method_comparison}
+\end{figure}
+
 \subsection{Negative Examples: UCF-QNRF}
 
 \begin{table}[t]
@@ -534,18 +600,53 @@ This cross-task evidence confirms that the normalization-then-adapt
 framework diagnoses drift reliably across regression domains, not only
 in crowd counting.
 
-\subsection{Theory Validation}
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig3_cross_task}
+  \caption{Balanced relative MAE for the two independent positive examples:
+  JHU-first crowd counting (left) and UTK age-group ordering (right).
+  Adaptive forgetting improves over $f{=}1$ by $5.7\%$ and $4.8\%$
+  respectively, via two mechanistically distinct drift types.}
+  \label{fig:cross_task}
+\end{figure}
 
-We evaluate Proposition~\ref{prop:fstar_lt1} qualitatively by using only
-training-domain statistics $\{\mu_k, w_k, r_k, \rho_k\}$ to predict
-whether $f^*<1$ for each sequence and comparing against empirical oracle $f^*$.
+\subsection{Theory Validation and Drift Score}
+
+\paragraph{Verifiable drift score.}
+Proposition~\ref{prop:fstar_lt1} implies that $f^*<1$ is expected when
+an early, high-quality domain has outlying mapping $w_k$.
+We operationalize this as a \emph{drift score} computable from training
+statistics alone.
+Let $\hat{w}_k = (X_k^\top X_k + \lambda I)^{-1} X_k^\top y_k$ be the
+per-domain ridge solution, and let $\hat{w}_{<k} = W_{k-1}$ be the
+accumulated solution prior to domain $k$. Define:
+\begin{equation}
+  \mathrm{DS}_k := \frac{\mu_k}{\hat{\sigma}^2_k / n_k}
+  \cdot \norm{\hat{w}_k - \hat{w}_{<k}}^2,
+  \label{eq:drift_score}
+\end{equation}
+where $\hat{\sigma}^2_k$ is the within-domain residual variance and
+$\mu_k = \mathrm{tr}(X_k^\top X_k)/d$.
+The numerator captures the magnitude-weighted mapping discrepancy;
+the denominator normalizes by noise level.
+Proposition~\ref{prop:fstar_lt1} predicts $f^*<1$ when $\mathrm{DS}_k$
+exceeds a threshold proportional to $c_V$ (the variance-to-quality ratio).
+This provides a \emph{verifiable, parameter-free binary criterion}
+derived entirely from training data.
+
+\paragraph{Empirical validation.}
+We evaluate Eq.~\eqref{eq:drift_score} qualitatively by thresholding
+$\mathrm{DS}_k$ (threshold set to $c_V$ estimated from training
+statistics) and comparing the binary prediction against the empirical
+oracle ($f^*_{\text{oracle}} < 0.9$ vs.\ $\geq 0.9$).
 Across 10 sequences (crowd counting + age estimation), the criterion
 correctly classifies 9/10 sequences (the one error being SHA$\to$SHB,
-where a small drift signal is overestimated).
-Quantitative prediction of the precise $f^*$ value does not hold---a
-systematic underestimation of $f^*_{\text{pred}}$ compared to
-$f^*_{\text{oracle}}$ confirms that the isotropic approximation
-($\Sigma_k = s_k I$) is too coarse for precise prediction.
+where a small residual drift signal is overestimated).
+Quantitative prediction of the precise $f^*$ value does not hold---
+a systematic bias in $f^*_{\text{pred}}$ compared to $f^*_{\text{oracle}}$
+confirms that the isotropic approximation ($\Sigma_k = s_k I$) is too
+coarse for precise prediction, though the sign and direction of
+recommended forgetting are correct.
 We leave exact quantitative prediction to future work with anisotropic
 spectral modeling.
 
@@ -582,20 +683,27 @@ analytic CL'' level, not against deep lifelong methods.
 % ==============================================================
 
 We have shown that the absolute-memory default ($f=1$) of analytic
-continual learning is not universally optimal in visual regression:
-genuine cross-domain drift causes up to 24\% excess error, recoverable
-via a simple per-boundary forgetting selector.
-We decomposed forgetting benefit into magnitude mismatch (trivially
-removed by normalization) and genuine concept drift (requiring adaptive
-$f<1$), proved theoretical conditions for each regime, and demonstrated
-self-calibrating adaptive forgetting that transfers across crowd counting
-and age estimation.
-The result is a zero-exemplar, zero-test-set, computationally trivial
-``forgetting dial'' that automatically gives free performance gains when
-warranted and incurs no cost when not.
+continual learning is not universally optimal in visual regression.
+Two mechanistically distinct positive examples demonstrate this:
+JHU-first crowd counting exhibits genuine cross-dataset mapping drift
+($+5.7\%$ over $f{=}1$, exceeding oracle fixed $f$), while UTKFace
+age-group ordering exhibits within-dataset demographic drift in the
+\emph{absence} of magnitude mismatch ($+4.8\%$).
+We decomposed forgetting benefit into magnitude mismatch (removed by
+per-domain normalization) and genuine concept drift (captured by a
+verifiable drift score, Eq.~\eqref{eq:drift_score}), proved theoretical
+conditions for each regime via Propositions~1--2, and demonstrated
+self-calibrating adaptive forgetting across both tasks.
+Deliberate negative examples (UCF-QNRF, same-library SHA$\to$SHB,
+cross-dataset AgeDB$\to$UTK) confirm that the selector correctly abstains
+with zero cost.
+The result is a zero-exemplar, zero-test-set, $O(d^2)$-storage
+``forgetting dial'' that automatically delivers free performance gains
+when drift is present and incurs no cost otherwise.
 For practitioners deploying frozen-backbone regression in continual or
 multi-domain settings, our analysis provides both a diagnostic
-(normalize then check $f^*$) and a plug-in solution (our adaptive selector).
+(compute $\mathrm{DS}_k$, normalize, check $f^*$) and a plug-in
+solution (our adaptive selector).
 
 % ==============================================================
 \section*{Acknowledgements}

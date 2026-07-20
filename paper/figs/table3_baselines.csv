@@ -1,0 +1,5 @@
+order,sgd_rel_mae,sgd_nbwt,single_rel_mae,f1_rel_mae,adaptive_rel_mae
+JHU→SHA→SHB,2.408,-0.846,0.459,0.511,0.482
+JHU→SHB→SHA,1.479,0.274,0.459,0.511,0.483
+SHA→SHB,1.03,-0.116,0.324,0.365,0.365
+SHA→SHB→JHU,1.721,-0.373,0.454,0.51,0.51
