@@ -72,6 +72,10 @@ Deliberate negative examples (UCF-QNRF cross-dataset, same-library
 SHA$\to$SHB, cross-dataset AgeDB$\to$UTK) confirm that forgetting is
 \emph{not} universally beneficial and that our selector correctly
 abstains. The drift criterion matches empirical oracle in 9/10 sequences.
+We further validate on three additional tasks (AVA aesthetics,
+NYU Depth V2, KADID-10k IQA), where the framework delivers a third
+positive example (AVA, $+1.9\%$) and reveals a greedy per-boundary
+limitation in severe negative-transfer regimes (KADID).
 \end{abstract}
 
 % ==============================================================
@@ -400,6 +404,24 @@ UTK-Young ($\leq$30) and UTK-Old ($>$30) to create a within-dataset
 age-group split, and AgeDB (12k images, faces in the wild).
 Same metric: $\relmae$, balanced average.
 
+\paragraph{Extended regression tasks.}
+We additionally evaluate on three benchmarks spanning diverse visual
+regression modalities.
+\emph{KADID-10k}~\cite{kadid10k} contains 10{,}125 distorted images
+across 81 distortion types; we partition them into 5 distortion-family
+domains (Noise, Blur, Color, Compression, Spatial), each with 500
+training and 425 test images.
+\emph{AVA Aesthetics}~\cite{ava} is a 10\% subset (${\approx}25$k
+images) of the full AVA dataset; we create 3 score-tier domains by
+splitting the mean aesthetic score distribution at its 33rd and 67th
+percentiles (AVA-Low, AVA-Mid, AVA-High), each with 500 train and
+${\approx}1700$ test images.
+\emph{NYU Depth V2}~\cite{nyuv2} provides RGB-D pairs in
+203 indoor scenes (WebDataset format); we split scenes alphabetically
+into 3 equal-sized domain groups (67/68/68 scenes), each with 500
+train and 500 test frames, and regress mean depth per image.
+All three use the same frozen DINOv2 backbone and ridge head.
+
 \paragraph{Backbone and head.}
 All experiments use a frozen DINOv2 ViT-B/14 backbone.
 Features are $d=768$-dimensional patch tokens, spatially averaged.
@@ -610,6 +632,67 @@ in crowd counting.
   \label{fig:cross_task}
 \end{figure}
 
+\subsection{Extended Tasks: Aesthetics, Depth, and IQA}
+\label{sec:exp_extended}
+
+Table~\ref{tab:extended} reports results on the three additional tasks.
+
+\begin{table}[t]
+  \centering
+  \caption{Extended tasks: balanced relative MAE under mean normalization
+  (lower is better). $f^*$ is the oracle-optimal fixed factor;
+  Gain = improvement of Adaptive over $f{=}1$.
+  \textbf{Bold} marks the best continual-learning method per row.}
+  \label{tab:extended}
+  \small
+  \begin{tabular}{lcccccc}
+    \toprule
+    Task & Dom. & $f^*$ & $f{=}1$ & \textbf{Adaptive} & Single & Gain \\
+    \midrule
+    AVA Aesthetics  & 3 & 0.60 & 0.070 & \textbf{0.069} & 0.077 & $+1.9\%$ \\
+    NYU Depth V2    & 3 & 1.00 & 0.090 & 0.090          & \textbf{0.072} & $-0.2\%$ \\
+    KADID-10k IQA   & 5 & 0.25 & 0.333 & 0.333          & \textbf{0.247} & $\pm$0\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{AVA Aesthetics -- third positive example.}
+Score-tier domains exhibit genuine drift ($f^*=0.60$ after normalization).
+The adaptive selector correctly identifies the drift and delivers $+1.9\%$
+over $f{=}1$ ($f_{\text{used}}=[1.0, 0.55, 0.95]$), providing a third
+positive example mechanistically distinct from crowd counting and age
+estimation: here drift arises from content bias across aesthetic quality
+tiers rather than dataset or demographic boundaries.
+
+\paragraph{NYU Depth V2 -- no-drift abstention.}
+Alphabetically-ordered scene groups produce $f^*=1$ after normalization:
+the scenes within each group share consistent depth ranges and the
+selector correctly abstains ($f_{\text{used}}=[1,1,0.85]$), with
+essentially zero gain/loss relative to $f{=}1$.
+Single-domain training (0.072) outperforms joint (0.090), indicating
+that the alphabetical split creates groups with distinct depth
+distributions; however, the adaptive forgetting framework correctly
+identifies that within-sequence recency discounting ($f<1$) does not
+help, and the underlying cause is negative transfer rather than drift.
+
+\paragraph{KADID-10k -- greedy selector limitation.}
+KADID reveals a failure mode of the per-boundary greedy approach.
+The oracle identifies strong global drift ($f^*=0.25$), yet the
+adaptive selector consistently picks $f=1$ at every boundary
+($f_{\text{used}}=[1,1,1,1,1]$), yielding no improvement over joint training.
+The cause is that orthogonal distortion families (noise, blur, color,
+compression, spatial) create severe \emph{negative transfer}: each
+distortion type has a structurally different optimal regressor, so
+single-domain training (0.247) substantially outperforms joint (0.333).
+At each local boundary, the balanced validation loss happens to prefer
+$f=1$ because the negative transfer from all accumulated prior domains is
+roughly uniform; globally, $f=0.25$ is better but requires evaluating
+all boundaries jointly---which the greedy selector cannot do.
+This is a second manifestation of sequence-history dependence: just as
+pairwise drift metrics (Section~\ref{sec:exp_adaptive}) cannot see full history,
+neither can the greedy per-boundary selector.
+We discuss this as a limitation in Section~\ref{sec:limitations}.
+
 \subsection{Theory Validation and Drift Score}
 
 \paragraph{Verifiable drift score.}
@@ -650,6 +733,27 @@ recommended forgetting are correct.
 We leave exact quantitative prediction to future work with anisotropic
 spectral modeling.
 
+\paragraph{Why pairwise drift metrics are insufficient.}
+A natural extension is a \emph{dual geometric drift score} combining
+feature-distribution shift $s_{\text{feat}}$ (cosine distance between
+domain mean embeddings) and mapping shift $s_{\text{map}}$ (cross-domain
+transfer error after mean normalisation), inspired by dual-metric
+continual learning detectors~\cite{hyCAL}.
+We evaluated both metrics on all crowd-counting orderings.
+Critically, the SHA$\to$SHB transition produces \emph{identical}
+pairwise statistics ($s_{\text{feat}}\!=\!0.287$,
+cross-transfer ratio $\approx 7.3$) regardless of whether it is
+preceded by JHU or not---yet the oracle optimum is $f^*\!=\!0.60$
+in JHU$\to$SHA$\to$SHB but $f^*\!=\!1$ in SHA$\to$SHB alone.
+This shows that $f^*$ at boundary $k$ depends on the \emph{full
+accumulated history} $\{D_1,\ldots,D_{k-1}\}$, not on the local
+$(D_{k-1},D_k)$ pair.
+Any closed-form continuous estimator derived solely from pairwise
+statistics is therefore fundamentally limited.
+This finding motivates our sufficient-statistics selector, which
+evaluates candidate forgetting factors on the balanced multi-domain
+held-out loss and thereby naturally incorporates full sequence history.
+
 % ==============================================================
 \section{Limitations}
 \label{sec:limitations}
@@ -670,6 +774,19 @@ under our frozen-feature regime remains an open question.
 Our experiments use a linear ridge head. A 4096-dimensional random
 projection check suggests the main findings are not capacity artifacts,
 but non-linear heads may interact differently with forgetting.
+
+\paragraph{Greedy per-boundary selector.}
+The adaptive selector makes a locally optimal choice at each domain
+boundary using the balanced validation loss up to that point.
+KADID-10k demonstrates that this greedy approach can fail when the
+globally optimal $f$ requires coordinated discounting across all
+boundaries simultaneously: oracle $f^*=0.25$ requires every boundary
+to forget, but no single boundary locally benefits from forgetting
+because the negative transfer is distributed uniformly across all
+accumulated domains.
+A non-greedy variant---e.g., jointly optimizing $f$ across all
+boundaries or using a lookahead horizon---could address this, at the
+cost of $O(|\mathcal{F}|^T)$ complexity.
 
 \paragraph{Deep distillation baselines.}
 We do not fully implement FLCB's deep distillation variant, which
@@ -697,6 +814,10 @@ self-calibrating adaptive forgetting across both tasks.
 Deliberate negative examples (UCF-QNRF, same-library SHA$\to$SHB,
 cross-dataset AgeDB$\to$UTK) confirm that the selector correctly abstains
 with zero cost.
+Extended experiments on AVA aesthetics ($+1.9\%$), NYU Depth V2 (correct
+abstention), and KADID-10k IQA (greedy selector limitation identified)
+further characterize the method's applicability across diverse regression
+modalities.
 The result is a zero-exemplar, zero-test-set, $O(d^2)$-storage
 ``forgetting dial'' that automatically delivers free performance gains
 when drift is present and incurs no cost otherwise.
