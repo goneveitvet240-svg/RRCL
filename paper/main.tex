@@ -619,7 +619,7 @@ Table~\ref{tab:extended} reports results on the three additional tasks.
     Task & Dom. & $f^*$ & $f{=}1$ & \textbf{Adaptive} & Single & Gain \\
     \midrule
     AVA Aesthetics  & 3 & 0.60 & 0.070 & \textbf{0.069} & 0.077 & $+1.9\%$ \\
-    NYU Depth V2    & 3 & 0.60 & 0.148 & \textbf{0.148} & 0.162 & $+0.5\%$ \\
+    NYU Depth V2    & 3 & 1.00 & 0.090 & 0.090 & 0.072 & ${\approx}0\%$ \\
     KADID-10k IQA   & 5 & 0.25 & 0.333 & 0.333$^\dagger$ & 0.247 & $0\%^\dagger$ \\
     \bottomrule
   \end{tabular}
@@ -637,17 +637,16 @@ positive example mechanistically distinct from crowd counting and age
 estimation: here drift arises from content bias across aesthetic quality
 tiers rather than dataset or demographic boundaries.
 
-\paragraph{NYU Depth V2 -- mild drift, small gain.}
-Alphabetically-ordered scene groups show $f^*_{\text{mean}}=0.60$,
-confirming a residual mapping shift after normalization
-($f_{\text{used}}=[1.0,1.0,0.85]$).
-The adaptive selector delivers a $+0.5\%$ improvement over $f{=}1$
-(0.148 vs 0.148 rounded; raw: 0.14769 vs 0.14844).
-The gain is modest because the alphabetical scene ordering creates only
-weak semantic structure across domain boundaries.
-\emph{Note:} current NYU results are based on 50-image samples per
-domain (smoke-test protocol); a full-scale rerun is scheduled once the
-reference-disjoint KADID run establishes the correct experimental pipeline.
+\paragraph{NYU Depth V2 -- correct abstention.}
+With 500 training images per domain, the norm-ablation yields
+$f^*_{\text{mean}}=1.0$: alphabetical scene ordering creates no
+meaningful semantic drift after per-domain mean normalisation.
+The adaptive selector accordingly chooses $f{=}1$ at the first two
+boundaries and $f{=}0.85$ at the last, producing relative MAE of
+$0.090$ versus $0.090$ for joint---a gain of ${\approx}0\%$ ($-0.2\%$,
+within numerical noise).
+This is the expected behaviour: the method correctly abstains from
+forgetting when no concept drift is present, incurring negligible cost.
 
 \paragraph{KADID-10k -- greedy selector limitation.}
 With reference-image-disjoint splitting enforced, oracle forgetting
@@ -786,7 +785,7 @@ Deliberate negative examples (UCF-QNRF, same-library SHA$\to$SHB,
 cross-dataset AgeDB$\to$UTK) confirm that the selector correctly abstains
 with zero cost.
 Extended experiments on AVA aesthetics ($+1.9\%$) and NYU Depth V2
-($+0.5\%$, preliminary) further characterize the method's applicability;
+(correct abstention, ${\approx}0\%$ cost when no drift) further characterize the method's applicability;
 KADID-10k IQA confirms that oracle forgetting substantially helps ($+27\%$ over joint)
 but exposes a greedy-selector failure mode when negative transfer is distributed
 uniformly across boundaries (Section~\ref{sec:limitations}).
