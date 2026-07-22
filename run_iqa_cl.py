@@ -17,7 +17,9 @@ import time
 
 import numpy as np
 
+from adaptive_selector import BalancedSufficientStatsSelector
 from rls_head import ForgettingRidgeRLS
+from run_provenance import with_provenance
 from metrics import forgetting_matrix_stats
 
 
@@ -69,34 +71,69 @@ def sweep(tr, te, forgets, lam, mode):
     return best, rows
 
 
-def adaptive(tr, te, lam, mode, sel_grid, val_every=5):
+def adaptive(
+    tr,
+    te,
+    lam,
+    mode,
+    sel_grid,
+    val_every=5,
+    search_mode="continuous",
+    abstain_relative_gain=1e-4,
+):
     T = len(tr); d = tr[0][0].shape[1]; d_aug = d + 1; s = scales(tr, mode)
     head = ForgettingRidgeRLS(d_in=d, d_out=1, lam=lam)
-    Rf = []; Cf = []; Rv = []; Cv = []; Sv = []; nv = []; f_used = []
+    selector = BalancedSufficientStatsSelector(
+        d_aug, lam, search_mode=search_mode, grid=sel_grid,
+        abstain_relative_gain=abstain_relative_gain,
+    )
+    f_used, drift_scores = [], []
     M = np.full((T, T), np.nan)
     for t in range(T):
         X, y = tr[t]; yn = (y / s[t]).reshape(-1, 1); Xa = aug(X)
         idx = np.arange(X.shape[0]); vm = (idx % val_every == val_every - 1)
         Xf, yf, Xv, yv = Xa[~vm], yn[~vm], Xa[vm], yn[vm]
         if Xv.shape[0] == 0: Xv, yv = Xf, yf
-        Rf.append(Xf.T @ Xf); Cf.append(Xf.T @ yf)
-        Rv.append(Xv.T @ Xv); Cv.append(Xv.T @ yv); Sv.append(float(np.sum(yv * yv))); nv.append(Xv.shape[0])
-        if t == 0:
+        fit = [Xf.T @ Xf, Xf.T @ yf, float(np.sum(yf * yf)), Xf.shape[0]]
+        val = [Xv.T @ Xv, Xv.T @ yv, float(np.sum(yv * yv)), Xv.shape[0]]
+        selection = selector.select_and_update(fit, val)
+        f_t = selection.factor
+        f_used.append(f_t)
+        drift_scores.append(selection.drift_score)
+        head.begin_task(f_t); head.accumulate(X, yn); head.solve()
+        for i in range(t + 1):
+            Xt, yt = te[i]; pred = head.predict(Xt)[:, 0] * s[i]; M[t, i] = rel_mae(pred, yt)
+    return float(np.nanmean(M[T - 1, :T])), f_used, drift_scores, selector.state_bytes
+
+
+def vff_iqa(tr, te, lam, mode, gamma=1.5, xi=1e-6, f_min=0.05, val_every=5):
+    """Paleologu VFF-RLS adapted to domain-batched IQA (IEEE SPL 2008)."""
+    from vff_baselines import paleologu_vff_factor
+    T = len(tr); d = tr[0][0].shape[1]; s = scales(tr, mode)
+    head = ForgettingRidgeRLS(d_in=d, d_out=1, lam=lam)
+    f_used = []; M = np.full((T, T), np.nan)
+    for t in range(T):
+        X, y = tr[t]; yn = (y / s[t]).reshape(-1, 1)
+        idx = np.arange(X.shape[0]); vm = (idx % val_every == val_every - 1)
+        Xv, yv = X[vm], yn[vm]
+        if Xv.shape[0] == 0: Xv, yv = X, yn
+        if t == 0 or head.W is None:
             f_t = 1.0
         else:
-            bf, bo = 1.0, 1e18
-            for f in sel_grid:
-                A = lam * np.eye(d_aug); b = np.zeros((d_aug, 1))
-                for dd in range(t + 1):
-                    w = f ** (t - dd); A += w * Rf[dd]; b += w * Cf[dd]
-                W = np.linalg.solve(A, b)
-                errs = []
-                for dd in range(t + 1):
-                    q = float(np.sum(W * (Rv[dd] @ W))); l = float(np.sum(W * Cv[dd]))
-                    errs.append((q - 2 * l + Sv[dd]) / max(nv[dd], 1))
-                o = float(np.mean(errs))
-                if o < bo: bf, bo = float(f), o
-            f_t = bf
+            Xva = np.concatenate([Xv, np.ones((Xv.shape[0], 1))], axis=1)
+            err_true = yv[:, 0] * s[t]
+            error_power = float(np.mean((head.predict(Xv)[:, 0] * s[t] - err_true) ** 2))
+            fh = ForgettingRidgeRLS(d_in=d, d_out=1, lam=lam)
+            fh.begin_task()
+            Xf, yf = X[~vm], yn[~vm]
+            if Xf.shape[0] == 0: Xf, yf = X, yn
+            fh.accumulate(Xf, yf); fh.solve()
+            noise_power = float(np.mean((fh.predict(Xv)[:, 0] * s[t] - err_true) ** 2))
+            cov_inv = np.linalg.inv(head.R + lam * np.eye(head.d))
+            lev = np.einsum('ij,jk,ik->i', Xva, cov_inv, Xva)
+            leverage_power = float(np.mean(lev ** 2))
+            f_t = paleologu_vff_factor(error_power, noise_power, leverage_power,
+                                       gamma=gamma, xi=xi, f_min=f_min)
         f_used.append(f_t)
         head.begin_task(f_t); head.accumulate(X, yn); head.solve()
         for i in range(t + 1):
@@ -142,6 +179,8 @@ def main():
     ap.add_argument("--backbone", default="dinov2_vitb14")
     ap.add_argument("--max-per-domain", type=int, default=500)
     ap.add_argument("--ranpac-dim", type=int, default=2000)
+    ap.add_argument("--selector-search", choices=["continuous", "grid"], default="continuous")
+    ap.add_argument("--abstain-relative-gain", type=float, default=1e-4)
     ap.add_argument("--out", default="runs_real/kadid")
     a = ap.parse_args()
     forgets = [float(x) for x in a.forgets.split(",")]
@@ -172,16 +211,24 @@ def main():
 
     print("\n=== adaptive f / baselines (normalized regime, rel MAE) ===")
     rel_f1, _ = train_eval(tr, te, 1.0, a.lam, "mean")
-    rel_ad, f_used = adaptive(tr, te, a.lam, "mean", sel_grid)
+    rel_ad, f_used, drift_scores, selector_state_bytes = adaptive(
+        tr, te, a.lam, "mean", sel_grid,
+        search_mode=a.selector_search,
+        abstain_relative_gain=a.abstain_relative_gain,
+    )
     rel_sd = single_domain(tr, te, a.lam, "mean")
     rel_rp, _ = train_eval(tr, te, 1.0, a.lam, "mean", proj_dim=a.ranpac_dim)
     rel_sgd = sgd_seq(tr, te, "mean")
-    res.update(dict(f1=rel_f1, adaptive=rel_ad, f_used=f_used, single=rel_sd,
-                    ranpac=rel_rp, sgd=rel_sgd))
+    rel_vff, vff_f_used = vff_iqa(tr, te, a.lam, "mean")
+    res.update(dict(f1=rel_f1, adaptive=rel_ad, f_used=f_used,
+                    drift_scores=drift_scores, selector_search=a.selector_search,
+                    selector_state_bytes=selector_state_bytes, single=rel_sd,
+                    ranpac=rel_rp, vff=rel_vff, vff_f_used=vff_f_used, sgd=rel_sgd))
     print(f"  f1 (=joint)        rel = {rel_f1:.4f}")
     print(f"  adaptive f         rel = {rel_ad:.4f}   f_used={[round(x,2) for x in f_used]}")
     print(f"  single-domain      rel = {rel_sd:.4f}")
     print(f"  RanPAC(proj={a.ranpac_dim},f=1) rel = {rel_rp:.4f}")
+    print(f"  VFF-RLS(Paleologu) rel = {rel_vff:.4f}   f_used={[round(x,2) for x in vff_f_used]}")
     print(f"  SGD-seq(Adam)      rel = {rel_sgd:.4f}")
     print(f"  -> adaptive vs f1: {(rel_f1-rel_ad)/max(rel_f1,1e-9)*100:+.1f}%")
 
@@ -190,7 +237,8 @@ def main():
     tag = os.path.splitext(os.path.basename(a.config))[0]
     out_path = os.path.join(a.out, f"{tag}_result.json")
     with open(out_path, "w") as fh:
-        json.dump(dict(config=a.config, names=names, **res), fh, indent=2, ensure_ascii=False)
+        payload = with_provenance(dict(config=a.config, names=names, **res), a.config, vars(a))
+        json.dump(payload, fh, indent=2, ensure_ascii=False)
     print(f"\nsaved -> {out_path}  ({time.time()-t0:.1f}s)")
 
 

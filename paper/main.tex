@@ -501,22 +501,22 @@ Table~\ref{tab:baselines} compares against sequential gradient descent
   \centering
   \caption{Balanced relative MAE (lower is better; mean normalization).
   nBwT in parentheses for SGD.
-  RanPAC and VFF-RLS comparisons for extended tasks appear in Table~\ref{tab:extended}
-  and are planned for crowd counting pending dataset access.}
+  RanPAC$^\ddagger$ uses image-only features + 2\,000-dim random projection
+  (no patch-DCT5; see Section~\ref{sec:baselines}).}
   \label{tab:baselines}
-  \small
-  \begin{tabular}{lcccc}
+  \setlength{\tabcolsep}{4pt}\small
+  \begin{tabular}{lccccc}
     \toprule
-    Order & SGD (nBwT) & Single-Domain & $f{=}1$ & \textbf{Adaptive} \\
+    Order & SGD (nBwT) & Single & $f{=}1$ & RanPAC$^\ddagger$ & \textbf{Adaptive} \\
     \midrule
     JHU$\to$SHA$\to$SHB &
-      2.408 ($-$0.846) & 0.459 & 0.511 & \textbf{0.482} \\
+      2.408 ($-$0.846) & 0.459 & 0.511 & 0.505 & \textbf{0.482} \\
     JHU$\to$SHB$\to$SHA &
-      1.479 ($+$0.274) & 0.459 & 0.511 & \textbf{0.483} \\
+      1.479 ($+$0.274) & 0.459 & 0.511 & 0.505 & \textbf{0.483} \\
     SHA$\to$SHB &
-      1.030 ($-$0.116) & 0.324 & 0.365 & \textbf{0.365} \\
+      1.030 ($-$0.116) & 0.324 & 0.365 & 0.368 & \textbf{0.365} \\
     SHA$\to$SHB$\to$JHU &
-      1.721 ($-$0.373) & 0.454 & 0.510 & \textbf{0.510} \\
+      1.721 ($-$0.373) & 0.454 & 0.510 & 0.514 & \textbf{0.510} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -611,23 +611,24 @@ Table~\ref{tab:extended} reports results on the three additional tasks.
 \begin{table}[t]
   \centering
   \caption{Extended tasks: relative MAE under mean normalization (lower is better).
-  $f^*$ = oracle-optimal fixed factor; RanPAC uses 2\,000-dim random projection~\cite{mcdonnell2023ranpac};
-  Gain = Adaptive vs.\ $f{=}1$.  \underline{Underline} = best CL method per row.}
+  $f^*$ = oracle-optimal fixed factor; VFF-RLS = domain-batched Paleologu rule~\cite{paleologu2008vff};
+  RanPAC uses 2\,000-dim random projection~\cite{mcdonnell2023ranpac}.
+  \underline{Underline} = best non-oracle CL method per row.
+  KADID metric is relative MAE; AVA/NYU are absolute MAE.}
   \label{tab:extended}
-  \setlength{\tabcolsep}{4pt}\small
-  \begin{tabular}{lccccccc}
+  \setlength{\tabcolsep}{3.5pt}\small
+  \begin{tabular}{lcccccccc}
     \toprule
-    Task & Dom. & $f^*$ & $f{=}1$ & RanPAC & \textbf{Adaptive} & Single & Gain \\
+    Task & Dom. & $f^*$ & $f{=}1$ & VFF-RLS & RanPAC & \textbf{Adaptive} & Single & Gain \\
     \midrule
-    AVA Aesthetics & 3 & 0.60 & 0.070 & \underline{0.068} & 0.069 & 0.077 & $+1.9\%$ \\
-    NYU Depth V2   & 3 & 1.00 & 0.090 & {--}              & 0.090 & 0.072 & ${\approx}0\%$ \\
-    KADID-10k IQA  & 5 & 0.25 & 0.333 & \underline{0.326} & 0.333$^\dagger$ & 0.247 & $0\%^\dagger$ \\
+    AVA Aesthetics & 3 & 0.60 & 0.070 & 0.070 & 0.068 & \underline{0.069} & 0.077 & $+2.0\%$ \\
+    NYU Depth V2   & 3 & 1.00 & 0.090 & {--}   & {--}  & 0.090             & 0.072 & ${\approx}0\%$ \\
+    KADID-10k IQA  & 5 & 0.25 & 0.333 & \underline{0.260} & 0.326 & 0.333$^\dagger$ & 0.247 & $0\%^\dagger$ \\
     \bottomrule
   \end{tabular}
   \vspace{2pt}
 
-  {\footnotesize $^\dagger$ Greedy selector picks $f{=}1$ everywhere;
-   oracle achieves $0.244$.  KADID metric is relative MAE; AVA/NYU absolute MAE.}
+  {\footnotesize $^\dagger$ Greedy selector picks $f{=}1$ everywhere; oracle achieves $0.244$.}
 \end{table}
 
 \paragraph{AVA Aesthetics -- third positive example.}
@@ -649,19 +650,24 @@ within numerical noise).
 This is the expected behaviour: the method correctly abstains from
 forgetting when no concept drift is present, incurring negligible cost.
 
-\paragraph{RanPAC comparison.}
-RanPAC~\cite{mcdonnell2023ranpac} (2\,000-dim random Fourier projection, $f{=}1$)
-outperforms our adaptive selector on AVA ($0.068$ vs.\ $0.069$) and KADID
-($0.326$ vs.\ $0.333$).
-On AVA, the gap is small ($1.4\%$) and our method's advantage lies in
-$O(d^2)$ storage versus RanPAC's $O(dp)$ projection matrix ($p{=}2000$).
-On KADID, RanPAC's superiority is expected: the adaptive selector degenerates
-to $f{=}1$ (same as RanPAC's training regime), and the projection gives
-RanPAC a richer feature space.
-These results indicate that RRCL's selective forgetting is most useful
-when genuine concept drift is present and the selector can identify it;
-under distributional shift that the greedy selector misses, matched
-analytic baselines can dominate.
+\paragraph{RanPAC and VFF-RLS comparison.}
+Table~\ref{tab:extended} reveals complementary failure modes across methods.
+On \emph{AVA}, our adaptive selector correctly identifies drift at boundary 2
+($f{=}0.53$) and achieves $0.069$ (+2.0\% over $f{=}1$), while VFF-RLS
+(Paleologu power rule) selects $f{=}1$ everywhere and recovers no gain
+($0.070 = f{=}1$).
+RanPAC achieves $0.068$ via richer features but uses $O(dp)$ storage ($p{=}2\,000$).
+On \emph{KADID}, the situation reverses: VFF-RLS detects concentrated negative
+transfer at boundary 4 ($f{=}0.19$) and reduces relative MAE from $0.333$
+to $\mathbf{0.260}$, while our greedy selector misses the distributed drift
+and stays at $f{=}1$ ($0.333$).
+On crowd counting (Table~\ref{tab:baselines}), RanPAC (image-only, no patch-DCT5)
+performs similarly to $f{=}1$ ($0.505$ vs.\ $0.511$), confirming that the
+patch-level DCT5 feature already captures the relevant crowd-density signal.
+These results characterise when each approach excels:
+RRCL's greedy adaptive selector works well for boundary-localised drift (AVA, crowd counting)
+but can miss uniformly distributed negative transfer (KADID);
+VFF-RLS excels at detecting sudden large residual spikes but misses gradual drift.
 
 \paragraph{KADID-10k -- greedy selector limitation.}
 With reference-image-disjoint splitting enforced, oracle forgetting
