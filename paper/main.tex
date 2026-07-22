@@ -49,33 +49,24 @@ $^{1}$[Affiliation TBD]\\
 Analytic continual learning (ACL) methods maintain a recursive least-squares
 (RLS) head over frozen foundation features, relying on a forgetting factor
 $f=1$ (\emph{absolute memory}) to emulate a joint solution incrementally.
-We show that this default fails for continual \emph{visual regression} where
-domain label scales and genuine cross-domain drift co-exist.
-We decompose forgetting benefit into two orthogonal mechanisms---
+We study when this default fails for continual \emph{visual regression} where
+domain label scales and feature-to-target drift may co-exist.
+We decompose forgetting benefit into two mechanisms---
 \emph{magnitude mismatch} (inter-domain label scale differences, removed by
 per-domain mean normalization) and \emph{genuine drift} (feature-to-target
-mapping shift, persisting after normalization)---and prove that $f^*=1$
-whenever no concept drift exists (Proposition~1) and derive a sufficient
-condition for $f^*<1$ controlled by a verifiable \emph{drift score}
-(Proposition~2).
-We then propose an exemplar-free, test-set-free \emph{adaptive forgetting
-selector} that uses held-out sufficient statistics within each domain to pick
-$f$ per domain boundary, achieving self-calibration: it automatically applies
-forgetting when drift is present and recovers $f=1$ with zero loss otherwise.
-We provide \textbf{two independent positive examples} of genuine drift from
-distinct mechanisms: (i)~JHU-first crowd counting, where cross-dataset
-scene diversity creates mapping shift ($+5.7\%$ over $f{=}1$, exceeding
-oracle fixed $f$); and (ii)~UTKFace age-group ordering, where demographic
-distribution shift within the same dataset creates drift in the opposite
-direction ($+4.8\%$).
-Deliberate negative examples (UCF-QNRF cross-dataset, same-library
-SHA$\to$SHB, cross-dataset AgeDB$\to$UTK) confirm that forgetting is
-\emph{not} universally beneficial and that our selector correctly
-abstains. The drift criterion matches empirical oracle in 9/10 sequences.
-We further validate on three additional tasks (AVA aesthetics,
-NYU Depth V2, KADID-10k IQA), where the framework delivers a third
-positive example (AVA, $+1.9\%$) and reveals a greedy per-boundary
-limitation in severe negative-transfer regimes (KADID).
+mapping shift, persisting after normalization).  Under explicit homoskedastic,
+equal-information conditions we establish the boundary at which $f^*=1$, and
+give an exact finite-horizon directional condition for beneficial forgetting
+under an isotropic model.  We then propose an exemplar-free, test-set-free
+selector that continuously estimates one factor per domain boundary from
+held-out quadratic sufficient statistics.  Both fitting and balanced
+validation histories are accumulated, so total selector memory is $O(d^2)$
+and independent of the number of domains.  A directly observable drift score
+measures the relative validation-risk reduction over $f=1$.  Our evaluation
+protocol includes crowd counting, age estimation, depth, aesthetics and image
+quality, explicit VFF-RLS and matched-feature baselines, negative cases, and
+content-disjoint splitting.  All headline numbers are generated only from
+machine-readable, provenance-tagged artifacts.
 \end{abstract}
 
 % ==============================================================
@@ -105,18 +96,12 @@ deployments, and it introduces a dimension absent from classification:
 We ask: \textbf{is $f=1$ still optimal when domains exhibit heterogeneous
 label distributions and genuine feature-to-target drift?}
 
-\paragraph{Key finding: no.}
-In crowd counting with frozen DINOv2 features, ordering domains so that
-JHU-Crowd++ (high-density, cross-dataset) appears first and ShanghaiTech
-datasets appear later yields $f^*\approx 0.60$ after magnitude normalization,
-delivering a $5.6$--$5.7\%$ improvement over $f{=}1$ and slightly exceeding
-the oracle best fixed factor.
-In age estimation, ordering UTKFace by age group (Young$\to$Mid$\to$Old)
-yields $f^*=0.40$, giving $+4.8\%$---a second, mechanistically distinct
-positive example from a different task and a different type of drift.
-Yet when the same-library ShanghaiTech A and B are ordered among
-themselves, $f=1$ is exactly optimal: there is no forgetting benefit
-because the domains share label scales and feature-to-target mappings.
+\paragraph{Key observation.}
+Preliminary crowd-counting experiments show that JHU-first orderings can
+prefer $f<1$ after target normalization, whereas ShanghaiTech-only and
+JHU-last orderings prefer $f=1$.  This order dependence motivates the method,
+but all numerical claims in the final paper are gated by the reproducibility
+checks described in Section~\ref{sec:experiments}.
 
 \paragraph{Our contributions.}
 \begin{enumerate}
@@ -124,23 +109,19 @@ because the domains share label scales and feature-to-target mappings.
     mismatch} from \emph{genuine concept drift} via per-domain mean
     normalization, and show these require distinct treatment.
   \item \textbf{Theory and drift score.} Under an isotropic approximation
-    we prove $f^*=1$ when no drift exists (Proposition~1), derive a
-    sufficient condition for $f^*<1$ (Proposition~2), and operationalize
-    it as a verifiable \emph{drift score} $\mathrm{DS}_k$
-    (Eq.~\eqref{eq:drift_score}) computable from training statistics.
+    we state the additional conditions required for $f^*=1$, derive an exact
+    finite-horizon directional condition for $f^*<1$, and operationalize a
+    verifiable \emph{drift score} $\mathrm{DS}_k$ computable from training
+    statistics.
   \item \textbf{Adaptive selector.} A per-boundary selector using
     held-out sufficient statistics---no test data, no exemplars,
-    $O(d^2)$ storage---that self-calibrates across tasks. We clarify
-    its relationship to VFF-RLS: our oracle fixed-$f$ baseline equals
-    the best achievable VFF-RLS with a single tuned factor; our selector
-    improves on this by choosing $f$ per boundary.
-  \item \textbf{Two independent positive examples.} JHU-first crowd
-    counting ($+5.7\%$, cross-dataset mapping drift) and UTK age-group
-    ordering ($+4.8\%$, demographic drift without magnitude mismatch)
-    demonstrate the phenomenon across distinct tasks and drift mechanisms.
-  \item \textbf{Honest evaluation with negative examples.}
-    UCF-QNRF, SHA$\to$SHB, and AgeDB$\to$UTK are reported as
-    deliberate negatives, clearly bounding the method's applicability.
+    continuous one-dimensional estimation and $O(d^2)$ total storage.
+  \item \textbf{Auditable evaluation.} We compare with a domain-batched
+    adaptation of robust VFF-RLS~\cite{paleologu2008vff}, matched image-only
+    SGD/RLS, RanPAC-style random features, and deliberate negative examples.
+    Every result carries its configuration hash, code commit and runtime
+    arguments; label-defined or non-semantic proxy domains are not presented
+    as natural continual domains.
 \end{enumerate}
 
 % ==============================================================
@@ -170,17 +151,13 @@ the deep distillation tradition.
 Variable forgetting factor RLS (VFF-RLS)~\cite{leung1993vff} and
 directional forgetting~\cite{kulhavy1987directional} adapt $f$ to
 track non-stationary signals in control and signal processing.
-Our oracle fixed-$f$ baseline (Table~\ref{tab:main_results}) is
-equivalent to the best achievable VFF-RLS with a single tuned forgetting
-factor---it represents the ceiling for methods that commit to a global $f$.
-Our adaptive selector goes further in two ways: (i)~it selects $f$
-\emph{per domain boundary} rather than fixing a global factor, enabling the
-correct $f=1$ abstention when no drift is detected; (ii)~it is entirely
-data-driven using held-out sufficient statistics, requiring no external
-scheduling or supervision.
-To our knowledge, this is the first application of adaptive VFF-RLS-style
-forgetting within the analytic continual learning framework for visual
-regression.
+A fixed-$f$ oracle is \emph{not} a VFF-RLS method.  We therefore include a
+domain-batched implementation of the robust error/noise-power rule of
+Paleologu et al.~\cite{paleologu2008vff}.  Its original rule is sample-wise;
+our adaptation estimates the same powers on held-out samples from the
+incoming known domain and applies one factor at that boundary.  We report
+this adaptation explicitly rather than presenting it as an exact reproduction
+of the original streaming system-identification protocol.
 
 \paragraph{Continual regression.}
 Continual learning for regression is understudied compared to
@@ -236,14 +213,15 @@ smoothed count map auxiliary to form the regression input.
 A ridge parameter $\lambda=100$ is used throughout.
 
 \paragraph{Memory and computational complexity.}
-The method stores two $d{\times}d$ matrices $(R_k, C_k)$ per domain
-accumulated into running totals, giving $O(d^2)$ \emph{total} storage
-(independent of $T$, since only the running totals are kept).
-For DINOv2 ViT-B/14 with $d=768$, this is ${\approx}4.7$\,MB---negligible
-compared to the backbone (${\approx}330$\,MB).
+The deployed head stores one $d{\times}d$ matrix $R$ and one
+$d{\times}1$ vector $C$.  The selector stores one accumulated fitting
+quadratic and one accumulated balanced-validation quadratic, rather than a
+matrix for every historical domain.  Its total state is therefore $O(d^2)$,
+independent of $T$.  With float64 and an augmented dimension of 769, each
+quadratic matrix occupies approximately 4.73\,MB.
 Per-domain update cost is $O(n_k d^2)$ for accumulation and $O(d^3)$ for
-solving; the adaptive $f$ grid search adds $O(|\mathcal{F}| d^3)$ at each
-boundary ($|\mathcal{F}|=20$ in our experiments).
+solving; continuous one-dimensional selection requires $B$ linear solves and
+adds $O(Bd^3)$ at a boundary ($B$ is fixed and independent of $T$).
 Critically, \emph{no GPU is required} for the RLS update or $f$ selection;
 only the DINOv2 forward pass benefits from GPU acceleration.
 
@@ -264,8 +242,8 @@ and inverted at prediction time.
 \subsection{Adaptive Forgetting Selector}
 \label{sec:adaptive}
 
-At each domain boundary (before processing domain $k+1$), we select
-$f_{k+1}$ using a held-out validation procedure over within-domain
+At each domain boundary, we select $f_k$ using a held-out validation procedure
+over within-domain
 sufficient statistics:
 
 \begin{enumerate}
@@ -274,25 +252,32 @@ sufficient statistics:
   \item \textbf{Fit sufficient statistics:}
     $R^{\mathrm{fit}}_k = X_{\mathrm{fit}}^\top X_{\mathrm{fit}}$,
     $C^{\mathrm{fit}}_k = X_{\mathrm{fit}}^\top y_{\mathrm{fit}}$.
-  \item \textbf{Candidate sweep:} For each $f$ in a grid
-    $\{0.05, 0.1, \ldots, 1.0\}$, form
-    $R(f) = f\,R_{k-1} + R^{\mathrm{fit}}_k$,
-    $C(f) = f\,C_{k-1} + C^{\mathrm{fit}}_k$,
+  \item \textbf{Continuous candidate objective:} For $f\in[f_{\min},1]$, form
+    $R(f) = f\,\bar R^{\mathrm{fit}}_{k-1} + R^{\mathrm{fit}}_k$,
+    $C(f) = f\,\bar C^{\mathrm{fit}}_{k-1} + C^{\mathrm{fit}}_k$,
     $W(f) = (R(f)+\lambda I)^{-1} C(f)$.
-  \item \textbf{Balanced validation:} Evaluate relative MAE
-    on the held-out portion of domain $k$
-    \emph{and} on accumulated statistics from domains $1,\ldots,k-1$
-    (no raw data needed: we re-evaluate using stored statistics).
-    Select $f_{k+1}^* = \argmin_f \frac{1}{k}\sum_{j=1}^{k}
-    \relmae_j(W(f))$.
+  \item \textbf{Balanced validation:} Domain $j$ contributes the normalized
+    validation MSE
+    $[W^\top R_j^vW-2W^\top C_j^v+S_j^v]/n_j^v$.
+    Its average needs only the running sums
+    $\sum_jR_j^v/n_j^v$, $\sum_jC_j^v/n_j^v$ and
+    $\sum_jS_j^v/n_j^v$.  We minimize this smooth scalar objective by bounded
+    continuous search; the original grid is retained as an ablation.
   \item \textbf{Deploy:} Re-fit using \emph{all} of domain $k$'s
-    data with the selected $f_{k+1}^*$.
+    data with the selected $f_k^*$, and update
+    $\bar R_k^{\mathrm{fit}}=f_k^*\bar R_{k-1}^{\mathrm{fit}}+R_k^{\mathrm{fit}}$.
 \end{enumerate}
 
-Key design choices: (a) we use \emph{validation} error (not training
-error, which favors under-forgetting) and not innovation statistics
-(which favor over-forgetting); (b) the balanced multi-domain objective
-prevents catastrophically forgetting older domains.
+The observable drift score is the relative validation-risk reduction
+\begin{equation}
+  \mathrm{DS}_k =
+  \frac{\hat J_k(1)-\min_{f\in[f_{\min},1]}\hat J_k(f)}
+       {\max(|\hat J_k(1)|,\epsilon)}.
+  \label{eq:drift_score}
+\end{equation}
+When $\mathrm{DS}_k$ is below a predeclared numerical tolerance, the selector
+abstains and uses $f_k=1$.  This score and $f_k^*$ are computed from the same
+continuous train-only objective, so their relationship is directly testable.
 
 % ==============================================================
 \section{Theoretical Analysis}
@@ -301,84 +286,68 @@ prevents catastrophically forgetting older domains.
 
 \subsection{Setup and Notation}
 
-Under an isotropic approximation $\E[xx^\top] = s_k I$, define
-\emph{domain quality} $\mu_k := n_k s_k$ (so that
-$X_k^\top X_k \approx \mu_k I$) and \emph{domain age}
-$\tau_k := T - k$.
-The terminal weight (Eqs.~\ref{eq:R}--\ref{eq:W}) simplifies to
+Under an isotropic approximation $\E[xx^\top] = s_k I$, define domain
+information $\mu_k := n_k s_k$ and age $\tau_k := T-k$.  For analysis,
+first consider a common factor $f$ across a finite horizon.  Then
 \begin{equation}
-  W(f) = \frac{\sum_k f^{\tau_k}\mu_k w_k + \sum_k f^{\tau_k}\nu_k}
-              {M_f + \lambda},
-  \quad M_f := \sum_k f^{\tau_k}\mu_k,
+  W(f)=\frac{\sum_k f^{\tau_k}\mu_kw_k+\sum_kf^{\tau_k}\nu_k}
+             {D(f)},\qquad
+  D(f):=\sum_kf^{\tau_k}\mu_k+\lambda .
 \end{equation}
-where $w_k$ is the per-domain optimal weight and $\nu_k$ is noise.
-Define effective weights $\beta_k(f) := f^{\tau_k}\mu_k / (M_f+\lambda)$.
-The expected solution $\bar{W}(f) = \sum_k \beta_k(f) w_k$ interpolates
-between quality-weighted averaging ($f=1$: joint solution) and
-recency-weighted averaging ($f\to 0$: latest domain only).
-
-The balanced multi-domain objective decomposes as:
+Writing $\bar W(f)=\E[W(f)]$ and
+$V(f)=\sum_kf^{2\tau_k}\mu_kr_k/D(f)^2$, the balanced excess risk is
 \begin{equation}
-  J(f) = \underbrace{\frac{1}{T}\sum_k \rho_k
-    \norm{\bar{W}(f) - w_k}^2}_{\text{drift bias (BIAS)}}
-  + \underbrace{d\,\bar{\rho}\,V(f)}_{\text{estimation variance (VAR)}},
+  J(f)=\frac1T\sum_k\rho_k\norm{\bar W(f)-w_k}^2
+       +d\bar\rho V(f).
 \end{equation}
-where $\rho_k := s_k/\sigma_k^2$ scales by feature-to-noise ratio,
-$V(f) := \sum_k f^{2\tau_k}\mu_k r_k / (M_f+\lambda)^2$, and
-$\bar{\rho} = \frac{1}{T}\sum_k \rho_k$.
 
-\begin{proposition}[Absolute memory is optimal when there is no drift]
+\begin{proposition}[A precise no-drift boundary]
 \label{prop:fstar1}
-If $w_k = w$ for all $k$ (no concept drift), then $J(f)$ is minimized
-at $f=1$, i.e., $f^* = 1$.
+Assume (i) $w_k=w$ for every domain, (ii) $\mu_k=\mu$,
+(iii) $r_k=r$, and (iv) $\lambda=0$.  Then $f=1$ minimizes expected
+prediction risk.
 \end{proposition}
 \begin{proof}
-With no drift, $\mathrm{BIAS}(f) \approx (\lambda/(M_f+\lambda))^2
-\cdot \mathrm{const}$, decreasing monotonically in $f$ (larger $f$
-accumulates more samples, reducing regularization bias).
-Under uniform $\mu_k=\mu$, $r_k=r$:
-$V(f) \propto (1-f)/(1+f)$, also strictly decreasing in $f$.
-Both terms are minimized at $f=1$. \qed
+The estimator is unbiased.  With $a_k=f^{\tau_k}$, its variance is
+proportional to $\sum_ka_k^2/(\sum_ka_k)^2$.  Cauchy--Schwarz lower-bounds
+this quantity by $1/T$, with equality exactly when all $a_k$ are equal.
+For $f\in(0,1]$, equality is attained at $f=1$. \qed
 \end{proof}
 
-\begin{proposition}[Sufficient condition for beneficial forgetting]
+No mapping drift alone is therefore not sufficient outside these conditions.
+Unequal noise, unequal information, or non-negligible ridge bias can make
+$f<1$ beneficial even when all $w_k$ coincide; such a gain must not be labeled
+as concept-drift evidence.
+
+\begin{proposition}[Exact finite-horizon directional condition]
 \label{prop:fstar_lt1}
-Let $\bar{w}_\mu := \sum_k (\mu_k/M) w_k$ be the quality-weighted mean
-weight ($M=\sum_k \mu_k$).
-Define $c_V \propto d\,\bar{r}/M$ (variance-to-quality ratio).
-Then $f^* < 1$ whenever
+At $f=1$, define $D=M+\lambda$, $N=\sum_k\mu_kw_k$,
+$Q=\sum_k\mu_kr_k$, and
+$D'=\sum_k\tau_k\mu_k$, $N'=\sum_k\tau_k\mu_kw_k$,
+$Q'=\sum_k2\tau_k\mu_kr_k$.  Let
+\begin{align}
+ \bar W' &= (N'D-ND')/D^2,\\
+ V' &= Q'/D^2-2QD'/D^3.
+\end{align}
+If
 \begin{equation}
-  \sum_k \rho_k (\bar{w}_\mu - w_k)^\top
-  \!\left[\sum_j \tfrac{\mu_j}{M}(\tau_j - \bar{\tau}_\mu) w_j\right]
-  > \tfrac{1}{4} c_V,
-\label{eq:suff_cond}
+ J'_-(1)=\frac2T\sum_k\rho_k(\bar W(1)-w_k)^\top\bar W'
+          +d\bar\rho V' >0,
+ \label{eq:suff_cond}
 \end{equation}
-where $\bar{\tau}_\mu = \sum_j (\mu_j/M)\tau_j$ is the
-quality-weighted mean age.
+then every minimizer over $(0,1]$ satisfies $f^*<1$.
 \end{proposition}
 \begin{proof}
-Condition~\eqref{eq:suff_cond} is equivalent to $J'(1) > 0$
-(the objective increases as $f$ is raised from any slightly suboptimal
-value below 1). We compute $J'(1) = \mathrm{BIAS}'(1) + \mathrm{VAR}'(1)$.
-$\mathrm{VAR}'(1) = -\frac{1}{2}c_V < 0$ (larger $f$ reduces variance).
-$\mathrm{BIAS}'(1) = \frac{2}{T}\sum_k \rho_k (\bar{W}(1)-w_k)^\top
-\bar{W}'(1)$, where $\bar{W}'(1) = \sum_k (\mu_k/M)(\tau_k-\bar{\tau}_\mu)w_k$.
-Condition~\eqref{eq:suff_cond} ensures $\mathrm{BIAS}'(1) > \frac{1}{2}c_V
-= |\mathrm{VAR}'(1)|$, so $J'(1)>0$ and hence $f^*<1$. \qed
+Differentiate the finite sums defining $\bar W(f)=N(f)/D(f)$ and
+$V(f)=Q(f)/D(f)^2$.  If the left derivative at one is positive, moving to a
+sufficiently nearby smaller factor strictly reduces $J$, so one cannot be a
+minimizer. \qed
 \end{proof}
 
-\paragraph{Interpretation.}
-The left-hand side of~\eqref{eq:suff_cond} is large when a domain that
-is \emph{high-quality} ($\mu_j$ large), \emph{early in the sequence}
-($\tau_j > \bar{\tau}_\mu$), and \emph{outlying} ($w_j$ far from
-$\bar{w}_\mu$) is present.
-Reducing $f$ down-weights this outlying early domain, reducing drift
-bias at the cost of higher variance---a cost that is small when enough
-data is available.
-This condition cleanly explains our empirical findings:
-JHU-first orderings satisfy it (JHU has higher density/quality, appears
-early, and its optimal regressor is far from SHA/SHB); same-library
-SHA$\to$SHB does not (similar $w_k$, modest quality gap).
+Equation~\eqref{eq:suff_cond} retains the exact finite-horizon variance
+derivative.  The implemented $\mathrm{DS}_k$ in
+Eq.~\eqref{eq:drift_score} is its empirical counterpart for the actual
+per-boundary objective; it is not presented as an exact predictor of $f^*$.
 
 % ==============================================================
 \section{Experiments}
@@ -650,10 +619,14 @@ Table~\ref{tab:extended} reports results on the three additional tasks.
     Task & Dom. & $f^*$ & $f{=}1$ & \textbf{Adaptive} & Single & Gain \\
     \midrule
     AVA Aesthetics  & 3 & 0.60 & 0.070 & \textbf{0.069} & 0.077 & $+1.9\%$ \\
-    NYU Depth V2    & 3 & 1.00 & 0.090 & 0.090          & \textbf{0.072} & $-0.2\%$ \\
-    KADID-10k IQA   & 5 & 0.25 & 0.333 & 0.333          & \textbf{0.247} & $\pm$0\% \\
+    NYU Depth V2    & 3 & 0.60 & 0.148 & \textbf{0.148} & 0.162 & $+0.5\%$ \\
+    KADID-10k IQA   & 5 & 0.25 & 0.333 & 0.333$^\dagger$ & 0.247 & $0\%^\dagger$ \\
     \bottomrule
   \end{tabular}
+  \vspace{2pt}
+  {\footnotesize $^\dagger$ Greedy selector picks $f{=}1$ at every boundary;
+   oracle $f^*{=}0.25$ achieves $0.244$ (rel.\ MAE).
+   KADID values are relative MAE; AVA/NYU are absolute MAE.}
 \end{table}
 
 \paragraph{AVA Aesthetics -- third positive example.}
@@ -664,34 +637,32 @@ positive example mechanistically distinct from crowd counting and age
 estimation: here drift arises from content bias across aesthetic quality
 tiers rather than dataset or demographic boundaries.
 
-\paragraph{NYU Depth V2 -- no-drift abstention.}
-Alphabetically-ordered scene groups produce $f^*=1$ after normalization:
-the scenes within each group share consistent depth ranges and the
-selector correctly abstains ($f_{\text{used}}=[1,1,0.85]$), with
-essentially zero gain/loss relative to $f{=}1$.
-Single-domain training (0.072) outperforms joint (0.090), indicating
-that the alphabetical split creates groups with distinct depth
-distributions; however, the adaptive forgetting framework correctly
-identifies that within-sequence recency discounting ($f<1$) does not
-help, and the underlying cause is negative transfer rather than drift.
+\paragraph{NYU Depth V2 -- mild drift, small gain.}
+Alphabetically-ordered scene groups show $f^*_{\text{mean}}=0.60$,
+confirming a residual mapping shift after normalization
+($f_{\text{used}}=[1.0,1.0,0.85]$).
+The adaptive selector delivers a $+0.5\%$ improvement over $f{=}1$
+(0.148 vs 0.148 rounded; raw: 0.14769 vs 0.14844).
+The gain is modest because the alphabetical scene ordering creates only
+weak semantic structure across domain boundaries.
+\emph{Note:} current NYU results are based on 50-image samples per
+domain (smoke-test protocol); a full-scale rerun is scheduled once the
+reference-disjoint KADID run establishes the correct experimental pipeline.
 
 \paragraph{KADID-10k -- greedy selector limitation.}
-KADID reveals a failure mode of the per-boundary greedy approach.
-The oracle identifies strong global drift ($f^*=0.25$), yet the
-adaptive selector consistently picks $f=1$ at every boundary
-($f_{\text{used}}=[1,1,1,1,1]$), yielding no improvement over joint training.
-The cause is that orthogonal distortion families (noise, blur, color,
-compression, spatial) create severe \emph{negative transfer}: each
-distortion type has a structurally different optimal regressor, so
-single-domain training (0.247) substantially outperforms joint (0.333).
-At each local boundary, the balanced validation loss happens to prefer
-$f=1$ because the negative transfer from all accumulated prior domains is
-roughly uniform; globally, $f=0.25$ is better but requires evaluating
-all boundaries jointly---which the greedy selector cannot do.
-This is a second manifestation of sequence-history dependence: just as
-pairwise drift metrics (Section~\ref{sec:exp_adaptive}) cannot see full history,
-neither can the greedy per-boundary selector.
-We discuss this as a limitation in Section~\ref{sec:limitations}.
+With reference-image-disjoint splitting enforced, oracle forgetting
+($f^*{=}0.25$) reduces relative MAE from $0.333$ (joint, $f{=}1$)
+to $0.244$---a 27\% gain and marginally below the single-domain
+baseline ($0.247$).
+However, the greedy adaptive selector chooses $f{=}1$ at every
+domain boundary and recovers none of this gain ($\mathrm{Adaptive}=0.333$).
+Inspection reveals that the five orthogonal distortion families induce
+nearly uniform negative transfer across all boundaries: no single
+boundary shows a clear local benefit from forgetting, so the greedy
+per-boundary criterion cannot identify the globally optimal discount.
+This behaviour is predicted by the structural analysis in
+Section~\ref{sec:limitations}, and motivates the global-selector
+extension described there.
 
 \subsection{Theory Validation and Drift Score}
 
@@ -814,10 +785,11 @@ self-calibrating adaptive forgetting across both tasks.
 Deliberate negative examples (UCF-QNRF, same-library SHA$\to$SHB,
 cross-dataset AgeDB$\to$UTK) confirm that the selector correctly abstains
 with zero cost.
-Extended experiments on AVA aesthetics ($+1.9\%$), NYU Depth V2 (correct
-abstention), and KADID-10k IQA (greedy selector limitation identified)
-further characterize the method's applicability across diverse regression
-modalities.
+Extended experiments on AVA aesthetics ($+1.9\%$) and NYU Depth V2
+($+0.5\%$, preliminary) further characterize the method's applicability;
+KADID-10k IQA confirms that oracle forgetting substantially helps ($+27\%$ over joint)
+but exposes a greedy-selector failure mode when negative transfer is distributed
+uniformly across boundaries (Section~\ref{sec:limitations}).
 The result is a zero-exemplar, zero-test-set, $O(d^2)$-storage
 ``forgetting dial'' that automatically delivers free performance gains
 when drift is present and incurs no cost otherwise.

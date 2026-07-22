@@ -29,8 +29,9 @@ import csv
 import glob
 import hashlib
 import os
-from dataclasses import dataclass, field
-from typing import List, Optional
+import re
+from dataclasses import dataclass
+from typing import List
 
 import numpy as np
 from PIL import Image
@@ -48,6 +49,7 @@ class IQASpec:
     mos_col: str = "MOS"
     filter_col: str = ""
     filter_val: str = ""   # comma-separated allowed values
+    group_col: str = ""    # keep related contents in the same train/test split
     train_ratio: float = 0.8
     split_seed: int = 42
 
@@ -61,20 +63,38 @@ def build_iqa_config(cfg):
             mos_col=d.get("mos_col", "MOS"),
             filter_col=d.get("filter_col", ""),
             filter_val=d.get("filter_val", ""),
+            group_col=d.get("group_col", ""),
             train_ratio=float(d.get("train_ratio", 0.8)),
             split_seed=int(d.get("split_seed", 42)),
         ))
     return out
 
 
+def _derived_csv_value(row, column, img_col):
+    """Return a CSV value, deriving KADID's distortion type when needed.
+
+    The official KADID ``dmos.csv`` has no ``dist_type`` column.  Its distorted
+    image names follow ``I{reference}_{distortion_type}_{level}.png``.  Keeping
+    the derivation here makes the dataset reader work with the official file
+    instead of requiring an undocumented, server-local CSV rewrite.
+    """
+    value = row.get(column, "").strip()
+    if value or column != "dist_type":
+        return value
+    filename = row.get(img_col, "").strip()
+    match = re.match(r"^[Ii]\d+_(\d+)_\d+\.[^.]+$", os.path.basename(filename))
+    return str(int(match.group(1))) if match else ""
+
+
 def _load_csv_pairs(spec: IQASpec):
-    """Returns list of (img_path, mos_float)."""
+    """Return ``(image_path, score, split_group)`` records."""
     pairs = []
     filter_vals = set(spec.filter_val.split(",")) if spec.filter_val else None
     with open(spec.csv, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if filter_vals and row.get(spec.filter_col, "").strip() not in filter_vals:
+            filter_value = _derived_csv_value(row, spec.filter_col, spec.img_col)
+            if filter_vals and filter_value not in filter_vals:
                 continue
             fname = row[spec.img_col].strip()
             mos = float(row[spec.mos_col])
@@ -87,7 +107,12 @@ def _load_csv_pairs(spec: IQASpec):
                         p = p + ext
                         break
             if os.path.exists(p):
-                pairs.append((p, mos))
+                group = row.get(spec.group_col, "").strip() if spec.group_col else p
+                if not group:
+                    raise ValueError(
+                        f"Missing split group '{spec.group_col}' for {fname} in {spec.csv}"
+                    )
+                pairs.append((p, mos, group))
     return pairs
 
 
@@ -108,7 +133,7 @@ def _load_tid_pairs(spec: IQASpec):
             mos, fname = float(parts[0]), parts[1]
             p = os.path.join(dist_dir, fname)
             if os.path.exists(p):
-                pairs.append((p, mos))
+                pairs.append((p, mos, p))
     return pairs
 
 
@@ -122,12 +147,22 @@ def _load_pairs(spec: IQASpec):
 
 
 def _train_test_split(pairs, ratio, seed):
+    """Deterministically split whole content groups, never individual variants."""
+    if not pairs:
+        raise RuntimeError("No IQA samples matched the dataset configuration")
+    groups = sorted({group for _, _, group in pairs})
+    if len(groups) < 2:
+        raise RuntimeError("IQA train/test splitting requires at least two content groups")
     rng = np.random.default_rng(seed)
-    idx = rng.permutation(len(pairs))
-    n_train = max(1, int(len(pairs) * ratio))
-    train_idx = sorted(idx[:n_train].tolist())
-    test_idx  = sorted(idx[n_train:].tolist())
-    return [pairs[i] for i in train_idx], [pairs[i] for i in test_idx]
+    permutation = rng.permutation(len(groups))
+    n_train = min(len(groups) - 1, max(1, int(len(groups) * ratio)))
+    train_groups = {groups[i] for i in permutation[:n_train]}
+    test_groups = set(groups) - train_groups
+    train = [record for record in pairs if record[2] in train_groups]
+    test = [record for record in pairs if record[2] in test_groups]
+    if train_groups & test_groups:
+        raise AssertionError("Content-group leakage in IQA train/test split")
+    return train, test
 
 
 class IQADomains:
@@ -153,13 +188,20 @@ class IQADomains:
                 idx = sorted(rng.choice(len(tr), size=int(self.max_per_domain), replace=False).tolist())
                 tr = [tr[i] for i in idx]
             self._splits[d] = {"train": tr, "test": te}
-            print(f"  Domain {spec.name}: train={len(tr)}, test={len(te)}")
+            train_groups = {record[2] for record in tr}
+            test_groups = {record[2] for record in te}
+            if train_groups & test_groups:
+                raise RuntimeError(f"Reference-content leakage in domain {spec.name}")
+            print(
+                f"  Domain {spec.name}: train={len(tr)} ({len(train_groups)} groups), "
+                f"test={len(te)} ({len(test_groups)} groups)"
+            )
 
     def n_domains(self):
         return len(self.specs)
 
     def stream(self, split, d):
-        for img_path, mos in self._splits[d][split]:
+        for img_path, mos, _ in self._splits[d][split]:
             feat = self._feat(img_path)
             yield feat, np.array([[mos]], dtype=np.float64), 1
 
