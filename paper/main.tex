@@ -53,20 +53,22 @@ We study when this default fails for continual \emph{visual regression} where
 domain label scales and feature-to-target drift may co-exist.
 We decompose forgetting benefit into two mechanisms---
 \emph{magnitude mismatch} (inter-domain label scale differences, removed by
-per-domain mean normalization) and \emph{genuine drift} (feature-to-target
-mapping shift, persisting after normalization).  Under explicit homoskedastic,
+per-domain mean normalization) and \emph{residual negative transfer}
+(forgetting benefit persisting after normalization; may reflect mapping drift,
+noise heteroscedasticity, or ridge-bias interactions).  Under explicit homoskedastic,
 equal-information conditions we establish the boundary at which $f^*=1$, and
 give an exact finite-horizon directional condition for beneficial forgetting
 under an isotropic model.  We then propose an exemplar-free, test-set-free
-selector that continuously estimates one factor per domain boundary from
-held-out quadratic sufficient statistics.  Both fitting and balanced
+selector that chooses one factor per domain boundary from held-out
+quadratic sufficient statistics.  Both fitting and balanced
 validation histories are accumulated, so total selector memory is $O(d^2)$
-and independent of the number of domains.  A directly observable drift score
+and independent of the number of domains.  A directly observable validation-gain score
 measures the relative validation-risk reduction over $f=1$.  Our evaluation
 protocol includes crowd counting, age estimation, depth, aesthetics and image
 quality, explicit VFF-RLS and matched-feature baselines, negative cases, and
-content-disjoint splitting.  All headline numbers are generated only from
-machine-readable, provenance-tagged artifacts.
+content-disjoint splitting.  The release protocol rejects results without
+machine-readable provenance, exact data-manifest hashes, and a clean code
+commit.
 \end{abstract}
 
 % ==============================================================
@@ -78,8 +80,8 @@ machine-readable, provenance-tagged artifacts.
 Large pretrained vision models (DINOv2~\cite{oquab2023dinov2},
 CLIP~\cite{radford2021learning}) extract rich, transferable features
 without fine-tuning. Pairing a \emph{frozen} backbone with a closed-form
-regression head enables continual learning that is privacy-friendly (no
-exemplar replay), computationally lightweight (no backpropagation), and
+regression head enables exemplar-free continual learning with reduced raw-data
+retention, lightweight updates (no backpropagation), and
 analytically exact. Recent analytic continual learning (ACL) works---
 ACIL~\cite{zhuang2022acil}, RanPAC~\cite{mcdonnell2023ranpac},
 DS-AL~\cite{yang2024dsal}, GACL~\cite{gao2024gacl}---exploit recursive
@@ -90,32 +92,33 @@ training exactly under $f=1$.
 Virtually all ACL work targets \emph{classification}, where $f=1$ (absolute
 memory) is celebrated as making incremental equivalent to joint.
 But visual \emph{regression}---crowd counting, age estimation, depth
-prediction---is commonplace in privacy-constrained, resource-limited
+prediction---is commonplace in data-retention-constrained, resource-limited
 deployments, and it introduces a dimension absent from classification:
 \emph{continuous, drifting label scales across domains}.
 We ask: \textbf{is $f=1$ still optimal when domains exhibit heterogeneous
-label distributions and genuine feature-to-target drift?}
+label distributions or residual negative transfer in feature-to-target mappings?}
 
-\paragraph{Key observation.}
-Preliminary crowd-counting experiments show that JHU-first orderings can
-prefer $f<1$ after target normalization, whereas ShanghaiTech-only and
-JHU-last orderings prefer $f=1$.  This order dependence motivates the method,
-but all numerical claims in the final paper are gated by the reproducibility
-checks described in Section~\ref{sec:experiments}.
+\paragraph{Motivating observation.}
+Exploratory crowd-counting runs suggested that the preferred factor may
+depend on domain order even after target normalization.  Those runs used
+inconsistent dataset roots and are not evidence.  They motivate the
+controlled, identical-manifest order study specified in
+Section~\ref{sec:experiments}.
 
 \paragraph{Our contributions.}
 \begin{enumerate}
-  \item \textbf{Mechanism decomposition.} We isolate \emph{magnitude
-    mismatch} from \emph{genuine concept drift} via per-domain mean
-    normalization, and show these require distinct treatment.
-  \item \textbf{Theory and drift score.} Under an isotropic approximation
+  \item \textbf{Mechanism-decomposition protocol.} We use per-domain mean
+    normalization to test whether a forgetting benefit is explained by
+    first-order target-scale mismatch or persists as residual negative
+    transfer.
+  \item \textbf{Theory and decision score.} Under an isotropic approximation
     we state the additional conditions required for $f^*=1$, derive an exact
     finite-horizon directional condition for $f^*<1$, and operationalize a
-    verifiable \emph{drift score} $\mathrm{DS}_k$ computable from training
+    verifiable train-only validation-gain score computable from sufficient
     statistics.
   \item \textbf{Adaptive selector.} A per-boundary selector using
     held-out sufficient statistics---no test data, no exemplars,
-    continuous one-dimensional estimation and $O(d^2)$ total storage.
+    global candidate-grid search and $O(d^2)$ total storage.
   \item \textbf{Auditable evaluation.} We compare with a domain-batched
     adaptation of robust VFF-RLS~\cite{paleologu2008vff}, matched image-only
     SGD/RLS, RanPAC-style random features, and deliberate negative examples.
@@ -130,27 +133,58 @@ checks described in Section~\ref{sec:experiments}.
 % ==============================================================
 
 \paragraph{Analytic continual learning.}
-ACIL~\cite{zhuang2022acil} first showed that recursive feature
+ACIL~\cite{zhuang2022acil} established that recursive feature
 accumulation with $f=1$ makes class-incremental learning equivalent to
 joint offline training. RanPAC~\cite{mcdonnell2023ranpac} extends this
 with random projections for kernel approximation.
 DS-AL and GACL~\cite{yang2024dsal,gao2024gacl} scale to larger class
-sets. All target classification and treat $f=1$ as the theoretically
-grounded default. \emph{None examines whether $f=1$ is appropriate for
-visual regression with drifting label scales.}
+sets. These methods target classification and use absolute memorization.
+They motivate our matched $f=1$ reference, but do not establish that the
+same weighting is optimal for heterogeneous visual regression.
 
 \paragraph{Lifelong crowd counting.}
-FLCB~\cite{flcb2022} is the closest precedent, using knowledge
-distillation with old-model constraints in an end-to-end deep framework.
+FLCB~\cite{flcb2022} introduced a domain-incremental self-distillation
+benchmark for lifelong crowd counting.  It uses end-to-end density
+regression with old-model constraints rather than a frozen representation
+and closed-form head.
 Our setting differs fundamentally: we freeze the backbone and use a
 closed-form analytic head, making our update one pass per domain with no
 backpropagation. This places us in the analytic CL tradition rather than
 the deep distillation tradition.
 
-\paragraph{Relation to VFF-RLS.}
+\paragraph{Continual blind IQA.}
+Several works study continual learning for blind image quality assessment
+(BIQA). BIQA-CL~\cite{zhang2023biqa_cl} appends one prediction head per
+dataset, regularizes the heads during sequential backpropagation, and uses an
+adaptive weighted sum at inference. LIQA~\cite{liqa2022} instead generates
+pseudo-features for old distortions and applies split-and-merge distillation;
+its final regressor is a single-head, task-agnostic model. TSN-IQA
+~\cite{chen2024tsn_iqa} freezes convolution filters but learns task-specific
+normalization parameters and prediction heads, then combines their outputs
+with a lightweight K-means gating mechanism. SILF~\cite{ma2023silf} uses
+dynamic parameter isolation, cross-task reuse, and selective pruning under a
+memory budget. These are essential task-specific comparators, not variants of
+one common multi-head design.  Our method differs in using a single shared
+closed-form ridge head without backpropagation or pseudo-feature replay, while
+remaining task-aware because the domain-specific target scale $s_k$ is needed
+at inference.
+
+\paragraph{Adaptive forgetting in RLS and analytic output layers.}
 Variable forgetting factor RLS (VFF-RLS)~\cite{leung1993vff} and
 directional forgetting~\cite{kulhavy1987directional} adapt $f$ to
 track non-stationary signals in control and signal processing.
+Adaptive-forgetting OS-ELM~\cite{lim2013affoselm} and DOS-ELM
+~\cite{cao2019doselm} are especially close mathematically: they combine
+fixed/random features, an RLS-type analytic output layer, and a dynamically
+adjusted forgetting factor, including regression experiments.  A concept
+drift map has also been used to regulate OS-ELM forgetting
+~\cite{yu2019driftmap}.  Therefore, our contribution is not the invention of
+adaptive forgetting for a closed-form regression head.  It is the
+domain-balanced, train-only sufficient-statistic selection rule and its study
+with frozen visual foundation features under task-aware domain-incremental
+regression.  SIFt-RLS~\cite{lai2024sift} further shows that scalar exponential
+forgetting can be too coarse by forgetting only in the incoming information
+subspace; it is a required directional baseline for the final evaluation.
 A fixed-$f$ oracle is \emph{not} a VFF-RLS method.  We therefore include a
 domain-batched implementation of the robust error/noise-power rule of
 Paleologu et al.~\cite{paleologu2008vff}.  Its original rule is sample-wise;
@@ -160,11 +194,14 @@ this adaptation explicitly rather than presenting it as an exact reproduction
 of the original streaming system-identification protocol.
 
 \paragraph{Continual regression.}
-Continual learning for regression is understudied compared to
-classification. EWC~\cite{kirkpatrick2017ewc} and LwF~\cite{li2017lwf}
-have regression variants but require backpropagation and typically
-exemplars. Our setting---frozen features, closed-form head,
-exemplar-free---occupies a distinct and practical niche.
+CLeaR~\cite{he2021clear} provides an adaptive buffered framework for
+non-stationary regression, while Zhao et al.~\cite{zhao2024statistical}
+analyze regularization-based continual learning on sequences of linear
+regression tasks. EWC~\cite{kirkpatrick2017ewc} and LwF~\cite{li2017lwf}
+can also be adapted to regression; they require backpropagation and,
+respectively, Fisher-state or old-model predictions, but not necessarily
+stored exemplars. Our setting is narrower: frozen visual features, a shared
+closed-form head, known domain boundaries, and no raw-example replay.
 
 % ==============================================================
 \section{Method}
@@ -177,17 +214,18 @@ exemplar-free---occupies a distinct and practical niche.
 We adopt the \emph{task-aware domain-incremental} (TADIL) setting: the
 domain identity $k$ is known during both training and inference, but
 original data from previous domains is unavailable after processing.
-This is standard in privacy-sensitive deployments (medical imaging, edge
-devices) and matches the setting of recent ACL
-work~\cite{zhuang2022acil,mcdonnell2023ranpac}.
+This models deployments with restricted raw-data retention.  It does not,
+by itself, provide a formal privacy guarantee: sufficient statistics may
+still leak information without an explicit privacy mechanism.
 We make no assumption of a shared feature-to-target mapping across domains;
 each domain may have its own optimal regressor $w_k$.
 
 Formally, we observe a sequence of $T$ domains $k=1,\dots,T$.
 Domain $k$ provides $n_k$ samples $\{(x_i, y_i)\}$ where
 $x_i \in \R^d$ are features extracted by a \emph{frozen} vision
-backbone (DINOv2 ViT-B/14, $d=768$) and $y_i \in \R$ is a scalar target
-(crowd count or age).
+backbone (DINOv2 ViT-B/14, $d=768$) and $y_i$ is either an image-level
+scalar target (age, aesthetics, IQA, total count) or a patch-level scalar
+target (crowd patch count or patch depth).
 We assume a linear model per domain: $y = x^\top w_k + \varepsilon_k$
 where $\varepsilon_k \sim \mathcal{N}(0, \sigma_k^2)$.
 After processing domain $k$, the original data is discarded---no exemplar
@@ -206,22 +244,27 @@ Setting $f_k=1$ for all $k$ recovers the joint ridge solution
 (Proposition~\ref{prop:fstar1}).
 Setting $f_k<1$ exponentially down-weights older domains.
 
-\paragraph{Patch-DCT5 features and image-count auxiliary.}
-Each image is processed by DINOv2 to yield patch-level tokens.
-We combine (i) raw patch features averaged spatially and (ii) a DCT-5
-smoothed count map auxiliary to form the regression input.
-A ridge parameter $\lambda=100$ is used throughout.
+\paragraph{Crowd dual-head prediction.}
+Each $518{\times}518$ image yields $37{\times}37=1369$ DINOv2 patch
+tokens.  A patch ridge head regresses a DCT-5-smoothed patch-count target,
+while a second image head regresses total count from the mean-pooled token.
+The final count is
+$0.25\sum_p\hat y_p+0.75\hat y_{\mathrm{image}}$.
+Age, aesthetics, and IQA use one mean-pooled image head.  Depth uses a
+patch head whose targets are mean metric depths within the corresponding
+patches. A ridge parameter $\lambda=100$ is used throughout.
 
 \paragraph{Memory and computational complexity.}
-The deployed head stores one $d{\times}d$ matrix $R$ and one
-$d{\times}1$ vector $C$.  The selector stores one accumulated fitting
+Each deployed ridge head stores one augmented $d{\times}d$ matrix $R$ and
+one $d{\times}1$ vector $C$ (crowd counting deploys two such heads).  The
+selector stores one accumulated fitting
 quadratic and one accumulated balanced-validation quadratic, rather than a
 matrix for every historical domain.  Its total state is therefore $O(d^2)$,
 independent of $T$.  With float64 and an augmented dimension of 769, each
 quadratic matrix occupies approximately 4.73\,MB.
 Per-domain update cost is $O(n_k d^2)$ for accumulation and $O(d^3)$ for
-solving; continuous one-dimensional selection requires $B$ linear solves and
-adds $O(Bd^3)$ at a boundary ($B$ is fixed and independent of $T$).
+solving; selecting from $B$ globally enumerated factors requires $B$ linear
+solves and adds $O(Bd^3)$ at a boundary ($B$ is fixed and independent of $T$).
 Critically, \emph{no GPU is required} for the RLS update or $f$ selection;
 only the DINOv2 forward pass benefits from GPU acceleration.
 
@@ -231,7 +274,7 @@ only the DINOv2 forward pass benefits from GPU acceleration.
 Crowd counts vary substantially across datasets (SHB: mean~123,
 JHU: mean~372, SHA: mean~541), a ${\sim}4\times$ spread.
 When this scale mismatch dominates, a forgetting factor $f<1$ merely
-compensates for magnitude differences rather than genuine concept drift.
+compensates for magnitude differences rather than residual negative transfer.
 To isolate the two mechanisms, we optionally normalize targets per domain
 by the domain training mean before accumulation:
 $\tilde{y}_{ki} = y_{ki} / \mu_k$, where $\mu_k =
@@ -247,12 +290,14 @@ over within-domain
 sufficient statistics:
 
 \begin{enumerate}
-  \item \textbf{Split:} Divide domain $k$'s training data 80/20 into
-    fit and held-out sets.
+  \item \textbf{Split:} Divide domain $k$'s training data into deterministic
+    80/20 fit and held-out partitions. For KADID, complete reference-image
+    groups rather than individual distortions are held out.
   \item \textbf{Fit sufficient statistics:}
     $R^{\mathrm{fit}}_k = X_{\mathrm{fit}}^\top X_{\mathrm{fit}}$,
     $C^{\mathrm{fit}}_k = X_{\mathrm{fit}}^\top y_{\mathrm{fit}}$.
-  \item \textbf{Continuous candidate objective:} For $f\in[f_{\min},1]$, form
+  \item \textbf{Candidate objective:} For $f$ in a predeclared grid
+    $\mathcal F\subset[f_{\min},1]$, form
     $R(f) = f\,\bar R^{\mathrm{fit}}_{k-1} + R^{\mathrm{fit}}_k$,
     $C(f) = f\,\bar C^{\mathrm{fit}}_{k-1} + C^{\mathrm{fit}}_k$,
     $W(f) = (R(f)+\lambda I)^{-1} C(f)$.
@@ -261,23 +306,28 @@ sufficient statistics:
     $[W^\top R_j^vW-2W^\top C_j^v+S_j^v]/n_j^v$.
     Its average needs only the running sums
     $\sum_jR_j^v/n_j^v$, $\sum_jC_j^v/n_j^v$ and
-    $\sum_jS_j^v/n_j^v$.  We minimize this smooth scalar objective by bounded
-    continuous search; the original grid is retained as an ablation.
-  \item \textbf{Deploy:} Re-fit using \emph{all} of domain $k$'s
-    data with the selected $f_k^*$, and update
-    $\bar R_k^{\mathrm{fit}}=f_k^*\bar R_{k-1}^{\mathrm{fit}}+R_k^{\mathrm{fit}}$.
+    $\sum_jS_j^v/n_j^v$.  We enumerate the complete grid and retain the
+    global grid minimizer. A continuous refinement is only an ablation because
+    $\hat J_k(f)$ has not been proven unimodal.
+  \item \textbf{Deploy and update state:} Update the deployed head using
+    \emph{all} of domain $k$'s data and the selected $f_k^*$. Separately,
+    update the selector's fitting state as
+    $\bar R_k^{\mathrm{fit}}=f_k^*\bar R_{k-1}^{\mathrm{fit}}+
+    R_k^{\mathrm{fit}}$; held-out samples remain only in the balanced
+    validation state.
 \end{enumerate}
 
-The observable drift score is the relative validation-risk reduction
+The observable validation-gain score is the relative validation-risk reduction
 \begin{equation}
-  \mathrm{DS}_k =
-  \frac{\hat J_k(1)-\min_{f\in[f_{\min},1]}\hat J_k(f)}
+  G_k =
+  \frac{\hat J_k(1)-\min_{f\in\mathcal F}\hat J_k(f)}
        {\max(|\hat J_k(1)|,\epsilon)}.
-  \label{eq:drift_score}
+  \label{eq:validation_gain}
 \end{equation}
-When $\mathrm{DS}_k$ is below a predeclared numerical tolerance, the selector
+When $G_k$ is below a predeclared numerical tolerance, the selector
 abstains and uses $f_k=1$.  This score and $f_k^*$ are computed from the same
-continuous train-only objective, so their relationship is directly testable.
+train-only objective. It measures actionable validation improvement, not a
+physically identified concept-drift magnitude.
 
 % ==============================================================
 \section{Theoretical Analysis}
@@ -345,9 +395,10 @@ minimizer. \qed
 \end{proof}
 
 Equation~\eqref{eq:suff_cond} retains the exact finite-horizon variance
-derivative.  The implemented $\mathrm{DS}_k$ in
-Eq.~\eqref{eq:drift_score} is its empirical counterpart for the actual
-per-boundary objective; it is not presented as an exact predictor of $f^*$.
+derivative.  The implemented validation-gain score $G_k$ in
+Eq.~\eqref{eq:validation_gain} is an empirical decision statistic for the
+actual per-boundary objective; it is not an exact estimator of the derivative
+or of $f^*$.
 
 % ==============================================================
 \section{Experiments}
@@ -357,27 +408,32 @@ per-boundary objective; it is not presented as an exact predictor of $f^*$.
 \subsection{Datasets and Evaluation}
 
 \paragraph{Crowd counting.}
-We use ShanghaiTech Part A (SHA; 300/182 train/test, mean count 541),
-ShanghaiTech Part B (SHB; 400/316, mean count 123),
-JHU-Crowd++ (JHU; 2272/500 train/val, mean count 372), and
-UCF-QNRF (QNRF; 1201/334, mean count 815).
+We use ShanghaiTech Part A (SHA; 300/182 train/test, mean count 541) and
+Part B (SHB; 400/316, mean count 123)~\cite{zhang2016shanghaitech},
+JHU-Crowd++ (JHU; 2272/500 train/val, mean count 372)
+~\cite{sindagi2019jhu}, and UCF-QNRF (QNRF; 1201/334, mean count
+815)~\cite{idrees2018qnrf}.
 Evaluation: relative MAE ($\relmae = \mathrm{MAE}/\mu_{\mathrm{test}}$)
 computed per domain; final score is the average across all domains in
 the sequence (\emph{balanced multi-domain average}).
-We report nBwT (negative backward transfer; higher = less forgetting of
-old domains).
+We also report each dataset's raw-count MAE and RMSE, plus nBwT
+(negative backward transfer; higher = less forgetting of old domains).
 
 \paragraph{Age estimation.}
-We use UTKFace (23k images, ages 1--116) split into
-UTK-Young ($\leq$30) and UTK-Old ($>$30) to create a within-dataset
-age-group split, and AgeDB (12k images, faces in the wild).
-Same metric: $\relmae$, balanced average.
+We use UTKFace~\cite{zhifei2017utkface} (23k images, ages 1--116), with the diagnostic
+label-defined split UTK-Young (ages 1--25) and UTK-Old (45--90), and
+AgeDB~\cite{moschoglou2017agedb} (12k images, faces in the wild) for
+cross-dataset sequences.
+The label-defined split is not treated as a natural continual domain because
+knowing its identity reveals the target range. We report MAE in years and
+RMSE in addition to balanced $\relmae$.
 
 \paragraph{Extended regression tasks.}
 We additionally evaluate on three benchmarks spanning diverse visual
 regression modalities.
 \emph{KADID-10k}~\cite{kadid10k} contains 10{,}125 distorted images
-across 81 distortion types; we partition them into 5 distortion-family
+generated from 81 reference images, 25 distortion types, and 5 severity
+levels. We partition the distortion types into 5 distortion-family
 domains (Noise, Blur, Color, Compression, Spatial), each with 500
 training and 425 test images.
 \emph{AVA Aesthetics}~\cite{ava} is a 10\% subset (${\approx}25$k
@@ -385,19 +441,31 @@ images) of the full AVA dataset; we create 3 score-tier domains by
 splitting the mean aesthetic score distribution at its 33rd and 67th
 percentiles (AVA-Low, AVA-Mid, AVA-High), each with 500 train and
 ${\approx}1700$ test images.
-\emph{NYU Depth V2}~\cite{nyuv2} provides RGB-D pairs in
-203 indoor scenes (WebDataset format); we split scenes alphabetically
-into 3 equal-sized domain groups (67/68/68 scenes), each with 500
-train and 500 test frames, and regress mean depth per image.
+\emph{NYU Depth V2}~\cite{nyuv2} is converted into three source-batch
+proxy domains derived from the available train/validation/test source
+partitions; no scene metadata is available in this conversion.  We regress
+mean metric depth for each DINOv2 patch, not one mean depth per image.
+This experiment is a pipeline/negative-control check, not evidence from
+natural semantic depth domains.
 All three use the same frozen DINOv2 backbone and ridge head.
 
 \paragraph{Backbone and head.}
 All experiments use a frozen DINOv2 ViT-B/14 backbone.
-Features are $d=768$-dimensional patch tokens, spatially averaged.
+Features are $d=768$-dimensional patch tokens; image-level tasks mean-pool
+them, whereas crowd patch counting and depth preserve the $37{\times}37$
+patch grid.
 Ridge regularization $\lambda=100$.
-For crowd counting we additionally test a patch-DCT-5 auxiliary
-(patch count targets weighted by 5 DCT basis functions).
-For age estimation, raw image embeddings are used.
+For crowd counting we use the dual-head prediction described in
+Section~\ref{sec:method}.  For IQA/AVA we report SRCC, PLCC, MAE, and
+RMSE; for depth we report AbsRel, RMSE, $\delta_1/\delta_2/\delta_3$,
+and SILog.
+
+\paragraph{Draft release gate.}
+All numerical tables in the present draft are provisional until the
+release validator passes on a clean commit.  The validator checks selected-file
+hashes across reordered sequences, $f=1$ order invariance, complete evaluation
+matrices, task-standard metrics, and provenance.  Values from earlier runs
+that used inconsistent dataset roots are not admissible as final evidence.
 
 \subsection{Magnitude--Drift Decomposition}
 \label{sec:exp_norm}
@@ -408,43 +476,37 @@ $\fstar$ under two normalization regimes: \emph{none} (raw targets) and
 
 \begin{table}[t]
   \centering
-  \caption{Optimal $f^*$ under no normalization (none) vs.\ per-domain
-  mean normalization (mean). Normalization removes magnitude mismatch;
-  surviving $f^*<1$ indicates genuine concept drift.}
+  \caption{\textbf{Result slots pending clean rerun.} Optimal $f^*$ under no
+  normalization (none) vs.\ per-domain mean normalization (mean).
+  A surviving $f^*<1$ would indicate residual negative transfer not
+  attributable to first-order label scale; it would not by itself identify
+  concept drift (Proposition~\ref{prop:fstar1}).}
   \label{tab:norm_ablation}
   \small
   \begin{tabular}{lccl}
     \toprule
     Order & $f^*_{\text{none}}$ & $f^*_{\text{mean}}$ & Interpretation \\
     \midrule
-    JHU$\to$SHA$\to$SHB & 0.40 & 0.60 & Genuine drift survives \\
-    SHA$\to$SHB          & 0.30 & 1.0  & Magnitude only (collapses) \\
-    SHA$\to$SHB$\to$JHU & 1.0  & 1.0  & No forgetting needed \\
+    JHU$\to$SHA$\to$SHB & -- & -- & Pending \\
+    SHA$\to$SHB          & -- & -- & Pending \\
+    SHA$\to$SHB$\to$JHU & -- & -- & Pending \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{fig2_norm_ablation}
-  \caption{Optimal forgetting factor $f^*$ under raw targets (blue) vs.\
-  mean-normalised targets (red) for all orderings studied (crowd counting
-  and age estimation). A gap between the two bars indicates a magnitude
-  artifact; coincidence of both bars at values $<1$ indicates genuine
-  concept drift.}
+  \fbox{\parbox[c][18mm][c]{0.92\columnwidth}{\centering
+  Pending release-valid normalization ablation}}
+  \caption{\textbf{Placeholder.} The final plot will compare raw-target and
+  mean-normalized $f^*$ using only release-valid artifacts.}
   \label{fig:norm_ablation}
 \end{figure}
 
-The SHA$\to$SHB ordering shows $f^*=0.30$ in raw targets but
-collapses to $f^*=1$ after normalization, confirming the apparent
-forgetting benefit was entirely attributable to the ${\sim}4\times$
-label-scale gap between these same-camera-library datasets.
-In contrast, JHU$\to$SHA$\to$SHB shows $f^*=0.40$ without normalization
-and $f^*=0.60$ after---forgetting benefit \emph{persists and even
-increases slightly}---confirming a residual mapping shift beyond
-mere label scale. The JHU-last sequence (SHA$\to$SHB$\to$JHU) has
-$f^*=1$ in both regimes, consistent with no forgetting being needed
-when the diverse JHU scenes appear last.
+The prespecified test asks whether normalization changes the fixed-factor
+optimum and whether any order effect survives under identical selected-file
+manifests. Even if it does, persistence under normalization establishes
+residual negative transfer, not mapping drift by itself.
 
 \subsection{Main Results: Adaptive Forgetting}
 \label{sec:exp_adaptive}
@@ -455,7 +517,8 @@ all under mean normalization.
 
 \begin{table}[t]
   \centering
-  \caption{Balanced relative MAE (lower is better) under mean
+  \caption{\textbf{Result slots pending clean rerun.} Balanced relative MAE
+  (lower is better) under mean
   normalization. $f_{\text{used}}$ lists the per-boundary $f$ chosen
   by our selector. ``Improv.'' = improvement over $f=1$.}
   \label{tab:main_results}
@@ -464,80 +527,58 @@ all under mean normalization.
     \toprule
     Order & $f{=}1$ & Oracle $f$ & \textbf{Adaptive} & Improv. \\
     \midrule
-    JHU$\to$SHA$\to$SHB &
-      0.511 & 0.496 {\small($f$=0.60)} &
-      \textbf{0.482} {\small([1,0.05,0.55])} & $+5.7\%$ \\
-    JHU$\to$SHB$\to$SHA &
-      0.511 & 0.479 {\small($f$=0.40)} &
-      \textbf{0.483} {\small([1,0.25,0.25])} & $+5.6\%$ \\
-    SHA$\to$SHB &
-      0.365 & 0.365 {\small($f$=1)} &
-      \textbf{0.365} {\small([1,1])} & $\pm$0\% \\
-    SHA$\to$SHB$\to$JHU &
-      0.510 & 0.510 {\small($f$=1)} &
-      \textbf{0.510} {\small([1,1,1])} & $\pm$0\% \\
+    JHU$\to$SHA$\to$SHB & -- & -- & -- & -- \\
+    JHU$\to$SHB$\to$SHA & -- & -- & -- & -- \\
+    SHA$\to$SHB & -- & -- & -- & -- \\
+    SHA$\to$SHB$\to$JHU & -- & -- & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The results reveal a consistent pattern tied to domain ordering.
-When JHU appears first, a residual mapping shift persists after
-normalization: the selector chooses $f<1$ at both transitions and
-delivers ${\sim}5.6$--$5.7\%$ improvement over $f{=}1$, matching or
-slightly exceeding the oracle best fixed $f$ (gap $\leq$0.004).
-When JHU appears last (SHA$\to$SHB$\to$JHU) or the sequence contains
-only ShanghaiTech datasets (SHA$\to$SHB), the oracle optimum is
-$f{=}1$, and the selector correctly recovers $f{=}1$ throughout
-with zero degradation---demonstrating that the method does not
-over-forget when no forgetting is warranted.
+The table will be populated only after selected-file hashes match across
+reordered sequences and the $f=1$ order-invariance check passes. The final
+analysis will report both absolute gain and the fraction of the test-selected
+fixed-oracle gain recovered; zero recovery is classified as a missed
+opportunity, not as a successful selector result.
 
 \subsection{Comparison with Baselines}
 
 Table~\ref{tab:baselines} compares against sequential gradient descent
 (SGD, image-only linear probe), independent single-domain models
-(upper bound for per-domain accuracy), and $f=1$ (analytic joint-equivalent).
+(per-domain reference ceiling; not a guaranteed upper bound when shared
+feature structure exists), and $f=1$ (analytic joint-equivalent).
 
 \begin{table}[t]
   \centering
-  \caption{Balanced relative MAE (lower is better; mean normalization).
+  \caption{\textbf{Result slots pending clean rerun.} Balanced relative MAE
+  (lower is better; mean normalization).
   nBwT in parentheses for SGD.
   RanPAC$^\ddagger$ uses image-only features + 2\,000-dim random projection
-  (no patch-DCT5; see Section~\ref{sec:baselines}).}
+  (no patch-DCT5; see Section~\ref{sec:method}).}
   \label{tab:baselines}
   \setlength{\tabcolsep}{4pt}\small
   \begin{tabular}{lccccc}
     \toprule
     Order & SGD (nBwT) & Single & $f{=}1$ & RanPAC$^\ddagger$ & \textbf{Adaptive} \\
     \midrule
-    JHU$\to$SHA$\to$SHB &
-      2.408 ($-$0.846) & 0.459 & 0.511 & 0.505 & \textbf{0.482} \\
-    JHU$\to$SHB$\to$SHA &
-      1.479 ($+$0.274) & 0.459 & 0.511 & 0.505 & \textbf{0.483} \\
-    SHA$\to$SHB &
-      1.030 ($-$0.116) & 0.324 & 0.365 & 0.368 & \textbf{0.365} \\
-    SHA$\to$SHB$\to$JHU &
-      1.721 ($-$0.373) & 0.454 & 0.510 & 0.514 & \textbf{0.510} \\
+    JHU$\to$SHA$\to$SHB & -- & -- & -- & -- & -- \\
+    JHU$\to$SHB$\to$SHA & -- & -- & -- & -- & -- \\
+    SHA$\to$SHB & -- & -- & -- & -- & -- \\
+    SHA$\to$SHB$\to$JHU & -- & -- & -- & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Sequential gradient-based training fails severely ($3\text{--}5\times$ worse
-than $f{=}1$; highly negative nBwT), confirming catastrophic forgetting.
-Notably, single-domain models outperform $f{=}1$ across all orderings
-(e.g.\ 0.459 vs.\ 0.511 for JHU-first), indicating genuine inter-domain
-mapping conflicts in normalized space that joint accumulation cannot fully
-resolve. Adaptive forgetting closes approximately 54\% of this gap on
-JHU-first orderings (from 0.511 toward 0.459), via selective discounting
-of earlier domains at each boundary.
+Final interpretation will distinguish optimization forgetting in SGD from
+negative transfer in the shared analytic head and will include uncertainty
+estimates.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{fig1_method_comparison}
-  \caption{Balanced relative MAE across four crowd-counting orderings
-  (lower is better). Background shading separates genuine-drift orderings
-  (red; JHU first) from magnitude-only / no-drift orderings (blue).
-  Adaptive forgetting reduces error by $5.6$--$5.7\%$ on drift orderings
-  while recovering $f{=}1$ with zero loss on no-drift orderings.}
+  \fbox{\parbox[c][18mm][c]{0.92\columnwidth}{\centering
+  Pending release-valid method comparison}}
+  \caption{\textbf{Placeholder.} Balanced relative MAE across
+  crowd-counting orderings will be regenerated from validated artifacts.}
   \label{fig:method_comparison}
 \end{figure}
 
@@ -545,205 +586,144 @@ of earlier domains at each boundary.
 
 \begin{table}[t]
   \centering
-  \caption{QNRF orderings: per-regime optimal $f^*$ and interpretation.}
+  \caption{\textbf{Result slots pending clean rerun.} QNRF orderings:
+  per-regime optimal $f^*$ and interpretation.}
   \label{tab:qnrf}
   \small
   \begin{tabular}{lccc}
     \toprule
     Order & $f^*_{\text{none}}$ & $f^*_{\text{mean}}$ & Interp. \\
     \midrule
-    QNRF$\to$SHA$\to$SHB & 0.15 & 1.0  & Magnitude only (collapses) \\
+    QNRF$\to$SHA$\to$SHB & -- & -- & Pending \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-QNRF does not replicate the JHU genuine-drift pattern.
-Without normalization, QNRF$\to$SHA$\to$SHB appears to benefit from
-aggressive forgetting ($f^*=0.15$), but this collapses to $f^*=1$
-after mean normalization---confirming the benefit was a magnitude
-artifact driven by QNRF's ${\sim}815$ mean count versus SHA/SHB's
-541/123.
-This constitutes an honest negative: not all heterogeneous orderings
-exhibit residual mapping drift after normalization.
+This sequence is retained as a prespecified replication/negative-control
+test. Its interpretation will be assigned only after both normalized and
+unnormalized sweeps pass the same release gate.
 
 \subsection{Cross-Task Transfer: Age Estimation}
 
 \begin{table}[t]
   \centering
-  \caption{Age estimation results. Balanced relative MAE.}
+  \caption{\textbf{Result slots pending clean rerun; diagnostic
+  label-defined domains.}
+  Age estimation results in balanced relative MAE; final reporting also
+  includes MAE in years.}
   \label{tab:age}
   \small
   \begin{tabular}{lcccc}
     \toprule
     Config. & $f^*_{\text{none}}$ & $f^*_{\text{mean}}$ & $f{=}1$ & \textbf{Adaptive} \\
     \midrule
-    UTK-Young$\to$Mid$\to$Old & 1.0 & 0.40 & 0.224 & \textbf{0.214} \\
+    UTK-young$\to$UTK-old & -- & -- & -- & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Table~\ref{tab:age} shows the pattern transfers to age estimation.
-Interestingly, the within-UTKFace age-group sequence exhibits
-\emph{no} magnitude mismatch ($f^*_{\text{none}}=1$), yet shows
-genuine drift after normalization ($f^*_{\text{mean}}=0.40$)---the
-opposite pattern from the SHA$\to$SHB crowd case.
-The adaptive selector correctly identifies the drift and delivers a
-$+4.8\%$ improvement ($f_{\text{used}}=[1.0, 0.60, 0.75]$).
-This cross-task evidence confirms that the normalization-then-adapt
-framework diagnoses drift reliably across regression domains, not only
-in crowd counting.
+Because domain identity is derived from age itself, this experiment is only
+a mechanistic diagnostic, not an independent natural-domain positive result.
+Cross-dataset AgeDB/UTK sequences and MAE in years are required for any final
+cross-task claim.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{fig3_cross_task}
-  \caption{Balanced relative MAE for the two independent positive examples:
-  JHU-first crowd counting (left) and UTK age-group ordering (right).
-  Adaptive forgetting improves over $f{=}1$ by $5.7\%$ and $4.8\%$
-  respectively, via two mechanistically distinct drift types.}
+  \fbox{\parbox[c][18mm][c]{0.92\columnwidth}{\centering
+  Pending release-valid cross-task comparison}}
+  \caption{\textbf{Placeholder; regenerate only from release-valid
+  artifacts.} Balanced relative MAE for crowd counting and the diagnostic
+  UTK age-group ordering. The latter is label-defined and is not counted as
+  a natural-domain replication.}
   \label{fig:cross_task}
 \end{figure}
 
 \subsection{Extended Tasks: Aesthetics, Depth, and IQA}
 \label{sec:exp_extended}
 
-Table~\ref{tab:extended} reports results on the three additional tasks.
+Table~\ref{tab:extended} reserves the final comparison schema for the three
+additional tasks.
 
 \begin{table}[t]
   \centering
-  \caption{Extended tasks: relative MAE under mean normalization (lower is better).
+  \caption{\textbf{Result slots pending clean rerun after protocol
+  corrections.} Relative MAE under mean normalization (lower is better).
   $f^*$ = oracle-optimal fixed factor; VFF-RLS = domain-batched Paleologu rule~\cite{paleologu2008vff};
-  RanPAC uses 2\,000-dim random projection~\cite{mcdonnell2023ranpac}.
-  \underline{Underline} = best non-oracle CL method per row.
-  KADID metric is relative MAE; AVA/NYU are absolute MAE.}
+  ``RanPAC-style'' denotes a 2\,000-dim random-feature ridge baseline,
+  not the full RanPAC classifier~\cite{mcdonnell2023ranpac}.
+  Final rows will additionally report SRCC/PLCC for IQA and aesthetics and
+  AbsRel/RMSE/$\delta$/SILog for depth.}
   \label{tab:extended}
   \setlength{\tabcolsep}{3.5pt}\small
   \begin{tabular}{lcccccccc}
     \toprule
     Task & Dom. & $f^*$ & $f{=}1$ & VFF-RLS & RanPAC & \textbf{Adaptive} & Single & Gain \\
     \midrule
-    AVA Aesthetics & 3 & 0.60 & 0.070 & 0.070 & 0.068 & \underline{0.069} & 0.077 & $+2.0\%$ \\
-    NYU Depth V2   & 3 & 1.00 & 0.090 & {--}   & {--}  & 0.090             & 0.072 & ${\approx}0\%$ \\
-    KADID-10k IQA  & 5 & 0.25 & 0.333 & \underline{0.260} & 0.326 & 0.333$^\dagger$ & 0.247 & $0\%^\dagger$ \\
+    AVA Aesthetics & 3 & -- & -- & -- & -- & -- & -- & -- \\
+    NYU Depth V2   & 3 & -- & -- & -- & -- & -- & -- & -- \\
+    KADID-10k IQA  & 5 & -- & -- & -- & -- & -- & -- & -- \\
     \bottomrule
   \end{tabular}
-  \vspace{2pt}
-
-  {\footnotesize $^\dagger$ Greedy selector picks $f{=}1$ everywhere; oracle achieves $0.244$.}
 \end{table}
 
-\paragraph{AVA Aesthetics -- third positive example.}
-Score-tier domains exhibit genuine drift ($f^*=0.60$ after normalization).
-The adaptive selector correctly identifies the drift and delivers $+1.9\%$
-over $f{=}1$ ($f_{\text{used}}=[1.0, 0.55, 0.95]$), providing a third
-positive example mechanistically distinct from crowd counting and age
-estimation: here drift arises from content bias across aesthetic quality
-tiers rather than dataset or demographic boundaries.
+\paragraph{AVA Aesthetics -- label-defined diagnostic.}
+AVA domains are score-tier partitions, not natural continual domains, and
+results here measure scalar-regression generalisation rather than domain-drift
+behaviour. They cannot serve as a natural-domain positive example. The
+corrected runner reports SRCC, PLCC, MAE, and RMSE and must be rerun.
 
-\paragraph{NYU Depth V2 -- correct abstention.}
-With 500 training images per domain, the norm-ablation yields
-$f^*_{\text{mean}}=1.0$: alphabetical scene ordering creates no
-meaningful semantic drift after per-domain mean normalisation.
-The adaptive selector accordingly chooses $f{=}1$ at the first two
-boundaries and $f{=}0.85$ at the last, producing relative MAE of
-$0.090$ versus $0.090$ for joint---a gain of ${\approx}0\%$ ($-0.2\%$,
-within numerical noise).
-This is the expected behaviour: the method correctly abstains from
-forgetting when no concept drift is present, incurring negligible cost.
+\paragraph{NYU Depth V2 -- negative-control protocol.}
+The current NYU conversion uses source-batch proxy domains, not alphabetical
+scene domains. The experiment is only a pipeline negative control. The
+corrected runner reports patch-depth AbsRel, RMSE, $\delta$ accuracies, and
+SILog.
 
 \paragraph{RanPAC and VFF-RLS comparison.}
-Table~\ref{tab:extended} reveals complementary failure modes across methods.
-On \emph{AVA}, our adaptive selector correctly identifies drift at boundary 2
-($f{=}0.53$) and achieves $0.069$ (+2.0\% over $f{=}1$), while VFF-RLS
-(Paleologu power rule) selects $f{=}1$ everywhere and recovers no gain
-($0.070 = f{=}1$).
-RanPAC achieves $0.068$ via richer features but uses $O(dp)$ storage ($p{=}2\,000$).
-On \emph{KADID}, the situation reverses: VFF-RLS detects concentrated negative
-transfer at boundary 4 ($f{=}0.19$) and reduces relative MAE from $0.333$
-to $\mathbf{0.260}$, while our greedy selector misses the distributed drift
-and stays at $f{=}1$ ($0.333$).
-On crowd counting (Table~\ref{tab:baselines}), RanPAC (image-only, no patch-DCT5)
-performs similarly to $f{=}1$ ($0.505$ vs.\ $0.511$), confirming that the
-patch-level DCT5 feature already captures the relevant crowd-density signal.
-These results characterise when each approach excels:
-RRCL's greedy adaptive selector works well for boundary-localised drift (AVA, crowd counting)
-but can miss uniformly distributed negative transfer (KADID);
-VFF-RLS excels at detecting sudden large residual spikes but misses gradual drift.
+The RanPAC-style baseline uses $O(dp+p^2)$ state ($p{=}2\,000$), whereas
+RRCL uses $O(d^2)$ selector state. Because the current crowd implementation
+also differs in its prediction head, it cannot isolate the random-feature
+effect; a matched-head ablation is required. The VFF-RLS comparison uses a
+documented domain-batched adaptation of a sample-wise signal-processing rule.
+No complementary-failure claim will be made until all methods are rerun from
+the same manifests.
 
 \paragraph{KADID-10k -- greedy selector limitation.}
-With reference-image-disjoint splitting enforced, oracle forgetting
-($f^*{=}0.25$) reduces relative MAE from $0.333$ (joint, $f{=}1$)
-to $0.244$---a 27\% gain and marginally below the single-domain
-baseline ($0.247$).
-However, the greedy adaptive selector chooses $f{=}1$ at every
-domain boundary and recovers none of this gain ($\mathrm{Adaptive}=0.333$).
-Inspection reveals that the five orthogonal distortion families induce
-nearly uniform negative transfer across all boundaries: no single
-boundary shows a clear local benefit from forgetting, so the greedy
-per-boundary criterion cannot identify the globally optimal discount.
-This behaviour is predicted by the structural analysis in
-Section~\ref{sec:limitations}, and motivates the global-selector
-extension described there.
+The earlier KADID run enforced reference-image-disjoint train/test splitting
+but not reference-disjoint selector fit/validation splitting. It is therefore
+invalidated by the corrected grouped selector protocol and must be rerun.
+Whether the greedy selector misses distributed negative transfer remains a
+prespecified hypothesis, not an established failure mode.
 
-\subsection{Theory Validation and Drift Score}
+\subsection{Theory--Selector Consistency}
 
-\paragraph{Verifiable drift score.}
-Proposition~\ref{prop:fstar_lt1} implies that $f^*<1$ is expected when
-an early, high-quality domain has outlying mapping $w_k$.
-We operationalize this as a \emph{drift score} computable from training
-statistics alone.
-Let $\hat{w}_k = (X_k^\top X_k + \lambda I)^{-1} X_k^\top y_k$ be the
-per-domain ridge solution, and let $\hat{w}_{<k} = W_{k-1}$ be the
-accumulated solution prior to domain $k$. Define:
-\begin{equation}
-  \mathrm{DS}_k := \frac{\mu_k}{\hat{\sigma}^2_k / n_k}
-  \cdot \norm{\hat{w}_k - \hat{w}_{<k}}^2,
-  \label{eq:drift_score}
-\end{equation}
-where $\hat{\sigma}^2_k$ is the within-domain residual variance and
-$\mu_k = \mathrm{tr}(X_k^\top X_k)/d$.
-The numerator captures the magnitude-weighted mapping discrepancy;
-the denominator normalizes by noise level.
-Proposition~\ref{prop:fstar_lt1} predicts $f^*<1$ when $\mathrm{DS}_k$
-exceeds a threshold proportional to $c_V$ (the variance-to-quality ratio).
-This provides a \emph{verifiable, parameter-free binary criterion}
-derived entirely from training data.
+\paragraph{What is directly verifiable.}
+The implemented score is $G_k$ in Eq.~\eqref{eq:validation_gain}: the
+relative reduction of a balanced held-out quadratic objective. Each result
+artifact stores $G_k$, $\hat J_k(1)$, the selected objective, and the complete
+factor choice at every boundary. This makes the selector's decision auditable
+without test labels. We deliberately do not rename $G_k$ a ``concept-drift
+magnitude,'' because label noise, unequal information, ridge bias, and
+representation error can also change it.
 
-\paragraph{Empirical validation.}
-We evaluate Eq.~\eqref{eq:drift_score} qualitatively by thresholding
-$\mathrm{DS}_k$ (threshold set to $c_V$ estimated from training
-statistics) and comparing the binary prediction against the empirical
-oracle ($f^*_{\text{oracle}} < 0.9$ vs.\ $\geq 0.9$).
-Across 10 sequences (crowd counting + age estimation), the criterion
-correctly classifies 9/10 sequences (the one error being SHA$\to$SHB,
-where a small residual drift signal is overestimated).
-Quantitative prediction of the precise $f^*$ value does not hold---
-a systematic bias in $f^*_{\text{pred}}$ compared to $f^*_{\text{oracle}}$
-confirms that the isotropic approximation ($\Sigma_k = s_k I$) is too
-coarse for precise prediction, though the sign and direction of
-recommended forgetting are correct.
-We leave exact quantitative prediction to future work with anisotropic
-spectral modeling.
+\paragraph{Scope of the propositions.}
+Propositions~\ref{prop:fstar1}--\ref{prop:fstar_lt1} analyze a common fixed
+factor under an isotropic finite-horizon model. The deployed algorithm chooses
+a causal sequence $(f_2,\ldots,f_T)$, under which domain $j$ receives weight
+$\prod_{\ell=j+1}^{T}f_\ell$. The propositions explain why $f=1$ needs
+stronger conditions than ``no mapping drift'' and provide a local directional
+diagnostic, but they are not a regret or optimality guarantee for the greedy
+selector. A clean theory artifact comparing train-only predictions with
+fixed-factor test oracles is required before any numerical accuracy claim is
+restored.
 
-\paragraph{Why pairwise drift metrics are insufficient.}
-A natural extension is a \emph{dual geometric drift score} combining
-feature-distribution shift $s_{\text{feat}}$ (cosine distance between
-domain mean embeddings) and mapping shift $s_{\text{map}}$ (cross-domain
-transfer error after mean normalisation), inspired by dual-metric
-continual learning detectors~\cite{hyCAL}.
-We evaluated both metrics on all crowd-counting orderings.
-Critically, the SHA$\to$SHB transition produces \emph{identical}
-pairwise statistics ($s_{\text{feat}}\!=\!0.287$,
-cross-transfer ratio $\approx 7.3$) regardless of whether it is
-preceded by JHU or not---yet the oracle optimum is $f^*\!=\!0.60$
-in JHU$\to$SHA$\to$SHB but $f^*\!=\!1$ in SHA$\to$SHB alone.
-This shows that $f^*$ at boundary $k$ depends on the \emph{full
-accumulated history} $\{D_1,\ldots,D_{k-1}\}$, not on the local
-$(D_{k-1},D_k)$ pair.
-Any closed-form continuous estimator derived solely from pairwise
-statistics is therefore fundamentally limited.
-This finding motivates our sufficient-statistics selector, which
-evaluates candidate forgetting factors on the balanced multi-domain
-held-out loss and thereby naturally incorporates full sequence history.
+\paragraph{Why a local pair score is insufficient.}
+The candidate model at boundary $k$ depends on the entire accumulated
+sufficient-statistic state, so two identical adjacent-domain pairs can imply
+different optimal discounts when their earlier histories differ. This
+structural observation motivates evaluating candidate factors against the
+balanced history rather than mapping a pairwise feature distance directly to
+$f_k$. The earlier numerical pairwise study remains provisional pending the
+same data-identity and provenance checks as the main results.
 
 % ==============================================================
 \section{Limitations}
@@ -752,29 +732,31 @@ held-out loss and thereby naturally incorporates full sequence history.
 
 \paragraph{Isotropic approximation.}
 Propositions~1--2 rely on $\Sigma_k = s_k I$; real DINOv2 features are
-non-isotropic. The qualitative insight holds (9/10 sequences correct),
-but precise $f^*$ prediction requires extending to anisotropic spectral
-models.
+non-isotropic, and the common-$f$ analysis does not guarantee the causal
+per-boundary selector.  An anisotropic analysis and a selector stability or
+regret bound remain open.
 
-\paragraph{QNRF genuine drift.}
-The JHU-true-drift phenomenon does not replicate strongly for
-UCF-QNRF. Whether other high-density datasets exhibit similar drift
-under our frozen-feature regime remains an open question.
+\paragraph{Natural domains and replication.}
+AVA score tiers and UTK age bands are label-defined; NYU source batches are
+proxy domains. They cannot establish natural-domain generalization. The final
+claim requires stable positive results on at least two independent,
+non-label-defined domain sequences with repeated seeds and confidence
+intervals.
 
-\paragraph{Linear head capacity.}
-Our experiments use a linear ridge head. A 4096-dimensional random
-projection check suggests the main findings are not capacity artifacts,
-but non-linear heads may interact differently with forgetting.
+\paragraph{Linear head capacity and directional forgetting.}
+Our experiments use scalar exponential forgetting in a linear ridge head.
+Random-feature expansion changes both capacity and storage and does not
+replace a matched directional-forgetting comparison. DOS-ELM and SIFt-RLS
+remain mandatory baselines for deciding whether the proposed selector is
+better than prior analytic adaptation.
 
 \paragraph{Greedy per-boundary selector.}
 The adaptive selector makes a locally optimal choice at each domain
 boundary using the balanced validation loss up to that point.
-KADID-10k demonstrates that this greedy approach can fail when the
-globally optimal $f$ requires coordinated discounting across all
-boundaries simultaneously: oracle $f^*=0.25$ requires every boundary
-to forget, but no single boundary locally benefits from forgetting
-because the negative transfer is distributed uniformly across all
-accumulated domains.
+An earlier KADID-10k snapshot suggested that this greedy approach can fail
+when the globally optimal factor requires coordinated discounting, but that
+snapshot is invalid under the corrected reference-group validation protocol
+and must be rerun.
 A non-greedy variant---e.g., jointly optimizing $f$ across all
 boundaries or using a lookahead horizon---could address this, at the
 cost of $O(|\mathcal{F}|^T)$ complexity.
@@ -785,38 +767,35 @@ operates in a different computational budget (end-to-end training,
 old-model constraints). Comparison is therefore at the ``closed-form
 analytic CL'' level, not against deep lifelong methods.
 
+\paragraph{Metric alignment and uncertainty.}
+The selector optimizes normalized MSE, whereas some headline summaries use
+relative MAE. Final evaluation must report their empirical alignment, task
+standard metrics, multiple fixed manifests/seeds, and paired confidence
+intervals. Small gains without these checks are not treated as reliable.
+
 % ==============================================================
 \section{Conclusion}
 \label{sec:conclusion}
 % ==============================================================
 
-We have shown that the absolute-memory default ($f=1$) of analytic
-continual learning is not universally optimal in visual regression.
-Two mechanistically distinct positive examples demonstrate this:
-JHU-first crowd counting exhibits genuine cross-dataset mapping drift
-($+5.7\%$ over $f{=}1$, exceeding oracle fixed $f$), while UTKFace
-age-group ordering exhibits within-dataset demographic drift in the
-\emph{absence} of magnitude mismatch ($+4.8\%$).
-We decomposed forgetting benefit into magnitude mismatch (removed by
-per-domain normalization) and genuine concept drift (captured by a
-verifiable drift score, Eq.~\eqref{eq:drift_score}), proved theoretical
-conditions for each regime via Propositions~1--2, and demonstrated
-self-calibrating adaptive forgetting across both tasks.
-Deliberate negative examples (UCF-QNRF, same-library SHA$\to$SHB,
-cross-dataset AgeDB$\to$UTK) confirm that the selector correctly abstains
-with zero cost.
-Extended experiments on AVA aesthetics ($+1.9\%$) and NYU Depth V2
-(correct abstention, ${\approx}0\%$ cost when no drift) further characterize the method's applicability;
-KADID-10k IQA confirms that oracle forgetting substantially helps ($+27\%$ over joint)
-but exposes a greedy-selector failure mode when negative transfer is distributed
-uniformly across boundaries (Section~\ref{sec:limitations}).
-The result is a zero-exemplar, zero-test-set, $O(d^2)$-storage
-``forgetting dial'' that automatically delivers free performance gains
-when drift is present and incurs no cost otherwise.
-For practitioners deploying frozen-backbone regression in continual or
-multi-domain settings, our analysis provides both a diagnostic
-(compute $\mathrm{DS}_k$, normalize, check $f^*$) and a plug-in
-solution (our adaptive selector).
+This work asks a narrower question than prior drafts: in task-aware
+domain-incremental visual regression with frozen foundation features and a
+shared ridge head, can train-only balanced sufficient statistics decide when
+historical information should be discounted?  The method separates
+first-order target-scale mismatch from residual negative transfer, enumerates
+a global factor grid at each boundary, and abstains when the held-out gain
+$G_k$ is negligible.  Its selector state is $O(d^2)$ and requires neither old
+raw examples nor test labels.
+
+The current manuscript does not claim ``first,'' SOTA, or free gains.
+Adaptive-forgetting OS-ELM and directional RLS are clear prior art, the theory
+covers a simplified common-factor model, and several earlier numerical
+artifacts are invalidated by stricter data-identity or grouped-validation
+checks.  The paper-level conclusion will be restored only after clean reruns
+show stable gains on at least two independent natural-domain sequences,
+compare against DOS-ELM and SIFt-RLS, report task-standard metrics with
+uncertainty, and pass the release validator.  Until then, RRCL is a promising,
+falsifiable method proposal rather than a completed SOTA result.
 
 % ==============================================================
 \section*{Acknowledgements}

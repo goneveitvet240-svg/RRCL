@@ -41,9 +41,12 @@
 }
 
 @article{flcb2022,
-  title     = {Towards Lifelong Crowd Counting},
-  author    = {Shu, Xiu and Jiang, Xiu and Zhang, Jie and others},
-  journal   = {IEEE Transactions on Image Processing},
+  title     = {Forget Less, Count Better: A Domain-Incremental
+               Self-Distillation Learning Benchmark for Lifelong Crowd Counting},
+  author    = {Gao, Jiaqi and Li, Jingqi and Shan, Hongming and Qu, Yanyun
+               and Wang, James Z. and Zhang, Junping},
+  journal   = {CoRR},
+  volume    = {abs/2205.03307},
   year      = {2022}
 }
 
@@ -54,11 +57,15 @@
   year      = {2017}
 }
 
-@inproceedings{li2017lwf,
+@article{li2017lwf,
   title     = {Learning Without Forgetting},
   author    = {Li, Zhizhong and Hoiem, Derek},
-  booktitle = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
-  year      = {2017}
+  journal   = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume    = {40},
+  number    = {12},
+  pages     = {2935--2947},
+  year      = {2018},
+  doi       = {10.1109/TPAMI.2017.2773081}
 }
 
 @article{leung1993vff,
@@ -108,4 +115,154 @@
   author    = {Moschoglou, Stylianos and Papaioannou, Athanasios and Sagonas, Christos and others},
   booktitle = {IEEE Conference on Computer Vision and Pattern Recognition Workshops},
   year      = {2017}
+}
+
+% ── Datasets ────────────────────────────────────────────────────────────────
+
+@inproceedings{ava,
+  title     = {{AVA}: A Large-Scale Database for Aesthetic Visual Analysis},
+  author    = {Murray, Naila and Marchesotti, Luca and Perronnin, Florent},
+  booktitle = {IEEE Conference on Computer Vision and Pattern Recognition},
+  year      = {2012}
+}
+
+@inproceedings{kadid10k,
+  title     = {{KADID-10k}: A Large-Scale Artificially Distorted {IQA} Database},
+  author    = {Lin, Hanhe and Hosu, Vlad and Saupe, Dietmar},
+  booktitle = {Eleventh International Conference on Quality of Multimedia Experience},
+  year      = {2019}
+}
+
+@inproceedings{nyuv2,
+  title     = {Indoor Segmentation and Support Inference from {RGB-D} Images},
+  author    = {Silberman, Nathan and Hoiem, Derek and Kohli, Pushmeet and Fergus, Rob},
+  booktitle = {European Conference on Computer Vision},
+  year      = {2012}
+}
+
+% ── Signal processing / adaptive filters ────────────────────────────────────
+
+@article{paleologu2008vff,
+  title     = {A Robust Variable Forgetting Factor Recursive Least-Squares Algorithm
+               for System Identification},
+  author    = {Paleologu, Constantin and Ciochina, Silviu and Benesty, Jacob},
+  journal   = {IEEE Signal Processing Letters},
+  volume    = {15},
+  pages     = {597--600},
+  year      = {2008}
+}
+
+% ── Continual IQA ────────────────────────────────────────────────────────────
+
+@article{liqa2022,
+  title     = {{LIQA}: Lifelong Blind Image Quality Assessment},
+  author    = {Liu, Jianzhao and Zhou, Wei and Li, Xin and Xu, Jiahua and Chen, Zhibo},
+  journal   = {IEEE Transactions on Multimedia},
+  volume    = {25},
+  pages     = {5358--5373},
+  year      = {2023},
+  doi       = {10.1109/TMM.2022.3190700}
+}
+
+@article{zhang2023biqa_cl,
+  title     = {Continual Learning for Blind Image Quality Assessment},
+  author    = {Zhang, Weixia and Li, Dingquan and Ma, Chao and Zhai, Guangtao
+               and Yang, Xiaokang and Ma, Kede},
+  journal   = {IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume    = {45},
+  number    = {3},
+  pages     = {2864--2878},
+  year      = {2023},
+  doi       = {10.1109/TPAMI.2022.3178874}
+}
+
+@article{ma2023silf,
+  title     = {Forgetting to Remember: A Scalable Incremental Learning Framework
+               for Cross-Task Blind Image Quality Assessment},
+  author    = {Ma, Rui and Wu, Qingbo and Ngan, King Ngi and Li, Hongliang
+               and Meng, Fanman and Xu, Linfeng},
+  journal   = {IEEE Transactions on Multimedia},
+  volume    = {25},
+  pages     = {8817--8827},
+  year      = {2023},
+  doi       = {10.1109/TMM.2023.3242143}
+}
+
+@article{chen2024tsn_iqa,
+  title     = {Task-Specific Normalization for Continual Learning of Blind
+               Image Quality Models},
+  author    = {Zhang, Weixia and Ma, Kede and Zhai, Guangtao and Yang, Xiaokang},
+  journal   = {IEEE Transactions on Image Processing},
+  volume    = {33},
+  pages     = {1898--1910},
+  year      = {2024},
+  doi       = {10.1109/TIP.2024.3371349}
+}
+
+% ── Adaptive analytic regression and continual regression ──────────────────
+
+@article{lim2013affoselm,
+  title     = {Low Complexity Adaptive Forgetting Factor for Online
+               Sequential Extreme Learning Machine ({OS-ELM}) for Application
+               to Nonstationary System Estimations},
+  author    = {Lim, Jun-seok and Lee, Seokjin and Pang, Hee-Suk},
+  journal   = {Neural Computing and Applications},
+  volume    = {22},
+  number    = {3--4},
+  pages     = {569--576},
+  year      = {2013},
+  doi       = {10.1007/s00521-012-0873-x}
+}
+
+@article{cao2019doselm,
+  title     = {Online Sequential Extreme Learning Machine With Dynamic
+               Forgetting Factor},
+  author    = {Cao, Weipeng and Ming, Zhong and Xu, Zhiwu and Zhang, Jiyong
+               and Wang, Qiang},
+  journal   = {IEEE Access},
+  volume    = {7},
+  pages     = {179746--179757},
+  year      = {2019},
+  doi       = {10.1109/ACCESS.2019.2959032}
+}
+
+@article{yu2019driftmap,
+  title     = {Adaptive Online Extreme Learning Machine by Regulating
+               Forgetting Factor by Concept Drift Map},
+  author    = {Yu, Hualong and Webb, Geoffrey I.},
+  journal   = {Neurocomputing},
+  volume    = {343},
+  pages     = {141--153},
+  year      = {2019},
+  doi       = {10.1016/j.neucom.2018.11.098}
+}
+
+@article{lai2024sift,
+  title     = {{SIFt-RLS}: Subspace of Information Forgetting Recursive
+               Least Squares},
+  author    = {Lai, Brian and Bernstein, Dennis S.},
+  journal   = {arXiv preprint arXiv:2404.10844},
+  year      = {2024}
+}
+
+@article{he2021clear,
+  title     = {{CLeaR}: An Adaptive Continual Learning Framework for
+               Regression Tasks},
+  author    = {He, Yujiang and Sick, Bernhard},
+  journal   = {AI Perspectives},
+  volume    = {3},
+  number    = {1},
+  pages     = {2},
+  year      = {2021},
+  doi       = {10.1186/s42467-021-00009-8}
+}
+
+@inproceedings{zhao2024statistical,
+  title     = {A Statistical Theory of Regularization-Based Continual Learning},
+  author    = {Zhao, Xuyang and Wang, Huiyuan and Huang, Weiran and Lin, Wei},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {235},
+  pages     = {61021--61039},
+  year      = {2024}
 }
