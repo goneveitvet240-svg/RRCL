@@ -36,7 +36,8 @@ def _arr(domains, split, t):
 def load_all(domains):
     T = domains.n_domains()
     return ({t: _arr(domains, "train", t) for t in range(T)},
-            {t: _arr(domains, "test", t) for t in range(T)})
+            {t: _arr(domains, "test", t) for t in range(T)},
+            {t: np.asarray(domains.groups("train", t)) for t in range(T)})
 
 
 def rel_mae(pred, gt):
@@ -49,6 +50,21 @@ def scales(tr, mode):
 
 def aug(X):
     return np.concatenate([X, np.ones((X.shape[0], 1))], axis=1)
+
+
+def grouped_validation_mask(groups, val_every=5):
+    """Hold out whole content/reference groups for selector validation."""
+    groups = np.asarray(groups)
+    unique_groups = np.unique(groups)
+    if unique_groups.size < 2:
+        raise ValueError("grouped selector validation needs at least two groups")
+    validation_groups = unique_groups[val_every - 1 :: val_every]
+    if validation_groups.size == 0:
+        validation_groups = unique_groups[-1:]
+    mask = np.isin(groups, validation_groups)
+    if not mask.any() or mask.all():
+        raise ValueError("grouped selector validation produced an empty partition")
+    return mask
 
 
 def final_task_metrics(head, te, domain_scales, predict=None):
@@ -94,6 +110,7 @@ def adaptive(
     lam,
     mode,
     sel_grid,
+    train_groups,
     val_every=5,
     search_mode="grid",
     abstain_relative_gain=1e-4,
@@ -108,7 +125,7 @@ def adaptive(
     M = np.full((T, T), np.nan)
     for t in range(T):
         X, y = tr[t]; yn = (y / s[t]).reshape(-1, 1); Xa = aug(X)
-        idx = np.arange(X.shape[0]); vm = (idx % val_every == val_every - 1)
+        vm = grouped_validation_mask(train_groups[t], val_every)
         Xf, yf, Xv, yv = Xa[~vm], yn[~vm], Xa[vm], yn[vm]
         if Xv.shape[0] == 0: Xv, yv = Xf, yf
         fit = [Xf.T @ Xf, Xf.T @ yf, float(np.sum(yf * yf)), Xf.shape[0]]
@@ -140,7 +157,17 @@ def adaptive(
     )
 
 
-def vff_iqa(tr, te, lam, mode, gamma=1.5, xi=1e-6, f_min=0.05, val_every=5):
+def vff_iqa(
+    tr,
+    te,
+    lam,
+    mode,
+    train_groups,
+    gamma=1.5,
+    xi=1e-6,
+    f_min=0.05,
+    val_every=5,
+):
     """Paleologu VFF-RLS adapted to domain-batched IQA (IEEE SPL 2008)."""
     from vff_baselines import paleologu_vff_factor
     T = len(tr); d = tr[0][0].shape[1]; s = scales(tr, mode)
@@ -148,7 +175,7 @@ def vff_iqa(tr, te, lam, mode, gamma=1.5, xi=1e-6, f_min=0.05, val_every=5):
     f_used = []; M = np.full((T, T), np.nan)
     for t in range(T):
         X, y = tr[t]; yn = (y / s[t]).reshape(-1, 1)
-        idx = np.arange(X.shape[0]); vm = (idx % val_every == val_every - 1)
+        vm = grouped_validation_mask(train_groups[t], val_every)
         Xv, yv = X[vm], yn[vm]
         if Xv.shape[0] == 0: Xv, yv = X, yn
         if t == 0 or head.W is None:
@@ -251,7 +278,7 @@ def main():
                          max_per_domain=a.max_per_domain)
     names = [d["name"] for d in cfg["domains"]]
     t0 = time.time()
-    tr, te = load_all(domains)
+    tr, te, train_groups = load_all(domains)
     print("domains:", names, "| sizes(train/test):",
           [(tr[t][0].shape[0], te[t][0].shape[0]) for t in tr])
 
@@ -288,7 +315,7 @@ def main():
         adaptive_metrics,
         selection_records,
     ) = adaptive(
-        tr, te, a.lam, "mean", sel_grid,
+        tr, te, a.lam, "mean", sel_grid, train_groups,
         search_mode=a.selector_search,
         abstain_relative_gain=a.abstain_relative_gain,
     )
@@ -298,7 +325,7 @@ def main():
     )
     rel_sgd, sgd_matrix, sgd_metrics = sgd_seq(tr, te, "mean")
     rel_vff, vff_f_used, vff_matrix, vff_metrics = vff_iqa(
-        tr, te, a.lam, "mean"
+        tr, te, a.lam, "mean", train_groups
     )
     verdict = classify_adaptive_result(
         rel_f1,

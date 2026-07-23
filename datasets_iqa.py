@@ -201,9 +201,12 @@ class IQADomains:
         return len(self.specs)
 
     def stream(self, split, d):
-        for img_path, mos, _ in self._splits[d][split]:
+        for img_path, mos, group in self._splits[d][split]:
             feat = self._feat(img_path)
-            yield feat, np.array([[mos]], dtype=np.float64), 1
+            yield feat, np.array([[mos]], dtype=np.float64), group
+
+    def groups(self, split, d):
+        return [group for _, _, group in self._splits[d][split]]
 
     def _feat(self, path):
         key = hashlib.md5((path + self.backbone + str(self.img_size)).encode()).hexdigest()

@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from datasets_iqa import IQASpec, _load_csv_pairs, _train_test_split
+from run_iqa_cl import grouped_validation_mask
 
 
 class KADIDSplitTest(unittest.TestCase):
@@ -47,6 +48,17 @@ class KADIDSplitTest(unittest.TestCase):
             self.assertFalse(train_refs & test_refs)
             self.assertEqual(len(train_refs), 4)
             self.assertEqual(len(test_refs), 1)
+
+    def test_selector_validation_holds_out_whole_reference_groups(self):
+        groups = ["I01"] * 3 + ["I02"] * 3 + ["I03"] * 3 + ["I04"] * 3
+        mask = grouped_validation_mask(groups, val_every=3)
+        fit_groups = {group for group, held_out in zip(groups, mask) if not held_out}
+        validation_groups = {
+            group for group, held_out in zip(groups, mask) if held_out
+        }
+        self.assertTrue(fit_groups)
+        self.assertTrue(validation_groups)
+        self.assertFalse(fit_groups & validation_groups)
 
 
 if __name__ == "__main__":
