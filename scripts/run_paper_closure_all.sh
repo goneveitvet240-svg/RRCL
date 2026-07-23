@@ -7,29 +7,42 @@
 #   nohup bash run_paper_closure_all.sh > runs_real/run_paper_closure_all.nohup 2>&1 &
 #
 # The script runs sequentially to avoid IO/GPU contention.
-set -u
-cd "$(dirname "$0")"
+set -euo pipefail
+cd "$(dirname "$0")/.."
 mkdir -p runs_real
 
-echo "===== [1/7] main norm-ablation ====="
-bash run_normabl_main_all.sh
+echo "===== [0/10] preflight ====="
+python scripts/preflight_experiments.py --check-data
+python -m unittest discover -s tests -v
 
-echo "===== [2/7] adaptive f ====="
-bash run_adaptf2_all.sh
+echo "===== [1/10] main norm-ablation ====="
+bash scripts/run_normabl_main_all.sh
 
-echo "===== [3/7] baselines ====="
-bash run_baselines_all.sh
+echo "===== [2/10] adaptive f ====="
+bash scripts/run_adaptf2_all.sh
 
-echo "===== [4/7] QNRF negative cases ====="
-bash run_qnrf_all.sh
+echo "===== [3/10] baselines ====="
+bash scripts/run_baselines_all.sh
 
-echo "===== [5/7] QNRF capacity projection ====="
-bash run_proj_qnrf.sh
+echo "===== [4/10] VFF-RLS baselines ====="
+bash scripts/run_vff_all.sh
 
-echo "===== [6/7] age transfer ====="
-bash run_age_all.sh
+echo "===== [5/10] QNRF negative cases ====="
+bash scripts/run_qnrf_all.sh
 
-echo "===== [7/7] theory diagnostic ====="
-bash run_theory_all.sh
+echo "===== [6/10] QNRF capacity projection ====="
+bash scripts/run_proj_qnrf.sh
+
+echo "===== [7/10] age transfer ====="
+bash scripts/run_age_all.sh
+
+echo "===== [8/10] theory diagnostic ====="
+bash scripts/run_theory_all.sh
+
+echo "===== [9/10] extended regression tasks ====="
+bash scripts/run_new_tasks.sh
+
+echo "===== [10/10] release validation ====="
+python scripts/validate_release.py
 
 echo "ALL PAPER-CLOSURE RUNS DONE"

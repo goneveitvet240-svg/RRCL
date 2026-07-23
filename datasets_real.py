@@ -1,4 +1,5 @@
 import glob
+import hashlib
 import os
 from dataclasses import dataclass
 
@@ -8,11 +9,30 @@ from PIL import Image
 from features import DinoFeatureExtractor, cache_key
 
 
+def _stable_domain_seed(sample_key: str, base_seed: int) -> int:
+    """Derive a position- and path-independent seed from a logical dataset key.
+
+    Using the sequence position index ``d`` as a seed offset makes the
+    selected training subset depend on *where* the dataset appears in the
+    sequence, which can confound ordering experiments (e.g. JHU-first vs
+    JHU-last would draw different images).  Hashing the filesystem root is
+    also insufficient because equivalent dataset copies may live at different
+    paths.  ``sample_key`` is therefore a stable logical identity such as
+    ``JHU-v2.0`` or ``ShanghaiTech-A``.
+    """
+    if not sample_key:
+        raise ValueError("sample_key must be a non-empty logical dataset identity")
+    digest = hashlib.sha256(sample_key.encode("utf-8")).digest()
+    offset = int.from_bytes(digest[:4], "little")
+    return (base_seed + offset) & 0xFFFF_FFFF_FFFF_FFFF
+
+
 @dataclass
 class DomainSpec:
     name: str
     kind: str
     root: str
+    sample_key: str = ""
     train_split: str = "train"
     test_split: str = "test"
     include_file: str = ""
@@ -28,6 +48,7 @@ def build_from_config(cfg):
                 name=d["name"],
                 kind=d.get("kind", "jhu"),
                 root=d["root"],
+                sample_key=d.get("sample_key", d["name"]),
                 train_split=d.get("train_split", "train"),
                 test_split=d.get("test_split", "test"),
                 include_file=d.get("include_file", ""),
@@ -54,6 +75,14 @@ class RealCountingDomains:
         return len(self.domains)
 
     def stream(self, split, d):
+        pairs, point_reader = self._selected_pairs(split, d)
+        for image_path, gt_path in pairs:
+            X = self._features(image_path)
+            points = point_reader(gt_path)
+            Y = _points_to_patch_counts(points, image_path, self.img_size, X.shape[0])
+            yield X, Y.reshape(-1, 1), X.shape[0]
+
+    def _selected_pairs(self, split, d):
         spec = self.domains[d]
         actual = spec.train_split if split == "train" else spec.test_split
         if spec.kind == "jhu":
@@ -85,14 +114,42 @@ class RealCountingDomains:
         if self.max_per_domain is not None and split == "train":
             n = int(self.max_per_domain)
             if len(pairs) > n:
-                rng = np.random.default_rng(self.sample_seed + d)
+                sample_key = spec.sample_key or spec.name
+                rng = np.random.default_rng(
+                    _stable_domain_seed(sample_key, self.sample_seed)
+                )
                 idx = sorted(rng.choice(len(pairs), size=n, replace=False).tolist())
                 pairs = [pairs[i] for i in idx]
-        for image_path, gt_path in pairs:
-            X = self._features(image_path)
-            points = point_reader(gt_path)
-            Y = _points_to_patch_counts(points, image_path, self.img_size, X.shape[0])
-            yield X, Y.reshape(-1, 1), X.shape[0]
+        return pairs, point_reader
+
+    def data_manifest(self):
+        """Return path-independent hashes of the exact selected train/test files."""
+        records = []
+        for domain_index, spec in enumerate(self.domains):
+            domain_record = {
+                "name": spec.name,
+                "sample_key": spec.sample_key or spec.name,
+                "kind": spec.kind,
+            }
+            for split in ("train", "test"):
+                pairs, _ = self._selected_pairs(split, domain_index)
+                identifiers = [
+                    f"{os.path.basename(image)}\t{os.path.basename(target)}"
+                    for image, target in pairs
+                ]
+                digest = hashlib.sha256(
+                    "\n".join(identifiers).encode("utf-8")
+                ).hexdigest()
+                domain_record[split] = {
+                    "count": len(identifiers),
+                    "ids_sha256": digest,
+                }
+            records.append(domain_record)
+        return {
+            "sample_seed": self.sample_seed,
+            "max_per_domain": self.max_per_domain,
+            "domains": records,
+        }
 
     def _features(self, image_path):
         key = cache_key(image_path, self.backbone, self.img_size)

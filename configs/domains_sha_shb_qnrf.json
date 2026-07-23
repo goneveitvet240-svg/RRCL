@@ -3,23 +3,26 @@
     {
       "name": "SHA",
       "kind": "shanghai",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_A",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_A",
+      "sample_key": "ShanghaiTech-A",
       "train_split": "train",
       "test_split": "test"
     },
     {
       "name": "SHB",
       "kind": "shanghai",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_B",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_B",
+      "sample_key": "ShanghaiTech-B",
       "train_split": "train",
       "test_split": "test"
     },
     {
       "name": "QNRF",
       "kind": "qnrf",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UCF_QNRF/UCF-QNRF_ECCV18",
-      "train_split": "Train",
-      "test_split": "Test"
+      "root": "/root/autodl-tmp/datasets/QNRF/UCF-QNRF_ECCV18",
+      "sample_key": "UCF-QNRF",
+      "train_split": "train",
+      "test_split": "test"
     }
   ]
 }

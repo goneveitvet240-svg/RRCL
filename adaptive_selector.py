@@ -41,7 +41,7 @@ class BalancedSufficientStatsSelector:
         lam: float,
         f_min: float = 0.05,
         f_max: float = 1.0,
-        search_mode: str = "continuous",
+        search_mode: str = "grid",
         grid: np.ndarray | None = None,
         abstain_relative_gain: float = 1e-4,
         continuous_iterations: int = 28,
@@ -101,8 +101,28 @@ class BalancedSufficientStatsSelector:
         return (quadratic - 2.0 * linear + val_S_balanced) / max(n_domains, 1)
 
     def _continuous_minimize(self, objective):
-        """Golden-section minimization of the continuous one-dimensional loss."""
-        left, right = self.f_min, self.f_max
+        """Golden-section refinement after a coarse grid pre-scan.
+
+        J(f) is not guaranteed to be unimodal (unequal noise or ridge bias
+        can create irregular loss surfaces), so pure golden-section from a
+        fixed starting interval may converge to a local minimum.  We therefore
+        run a coarse grid scan first to identify the best interval, then
+        apply golden-section within that interval for smooth refinement.
+        """
+        # --- coarse grid pre-scan ---
+        grid = np.round(np.arange(self.f_min, self.f_max + 1e-12, 0.05), 6)
+        grid_vals = [(float(g), objective(float(g))) for g in grid]
+        best_grid_f, best_grid_v = min(grid_vals, key=lambda t: t[1])
+
+        # Find the grid interval [left, right] containing the best grid point
+        # and apply golden-section refinement within it.
+        idx = [i for i, (f, _) in enumerate(grid_vals) if f == best_grid_f][0]
+        left = grid_vals[max(idx - 1, 0)][0]
+        right = grid_vals[min(idx + 1, len(grid_vals) - 1)][0]
+        if left >= right:
+            # Only one grid point — return it directly.
+            return best_grid_f, best_grid_v
+
         ratio = (np.sqrt(5.0) - 1.0) / 2.0
         x1 = right - ratio * (right - left)
         x2 = left + ratio * (right - left)
@@ -116,12 +136,14 @@ class BalancedSufficientStatsSelector:
                 left, x1, y1 = x1, x2, y2
                 x2 = left + ratio * (right - left)
                 y2 = objective(x2)
+        refined_mid = (left + right) / 2.0
         candidates = [
             (self.f_min, objective(self.f_min)),
             (self.f_max, objective(self.f_max)),
+            (best_grid_f, best_grid_v),
             (x1, y1),
             (x2, y2),
-            ((left + right) / 2.0, objective((left + right) / 2.0)),
+            (refined_mid, objective(refined_mid)),
         ]
         return min(candidates, key=lambda item: item[1])
 

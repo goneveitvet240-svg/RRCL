@@ -4,8 +4,8 @@ Baselines for the Pareto/CL comparison, SAME setting as adaptive f
 scale-invariant rel_MAE averaged over seen domains, + nBwT).
 
 Methods:
-  cf_f1     : closed-form absolute memory f=1  (== joint upper bound for analytic CL,
-              because incremental == joint when f=1)
+  cf_f1     : closed-form absolute memory f=1  (== matched centralized ridge,
+              because sufficient-statistic addition is order invariant)
   single    : per-domain closed-form model, evaluated on its OWN domain only
               (no sharing / no CL reference)
   sgd_seq   : sequential SGD linear probe over domains, NO replay / NO regularization
@@ -28,6 +28,7 @@ from metrics import forgetting_matrix_stats
 from run_real import _first_dim
 from run_real_image_aux import transform_patch_target, _image_feature, _image_target
 from run_real_norm_ablation import domain_scale, eval_domain, train_eval
+from run_provenance import with_provenance
 
 
 class LinHead:
@@ -50,6 +51,31 @@ class LinHead:
     def predict(self, X, non_negative=True):
         Y = self._aug(X) @ self.W
         return np.clip(Y, 0.0, None) if non_negative else Y
+
+
+class StandardizedClosedFormHead:
+    """Ridge head on the exact standardized image features used by SGD."""
+
+    def __init__(self, d_in, lam, mu, sd, proj_dim=0):
+        self.mu = mu
+        self.sd = sd
+        self.head = ForgettingRidgeRLS(
+            d_in=d_in, d_out=1, lam=lam, proj_dim=proj_dim
+        )
+
+    def begin_task(self, factor=1.0):
+        self.head.begin_task(factor)
+
+    def accumulate(self, X, Y):
+        self.head.accumulate((np.asarray(X) - self.mu) / self.sd, Y)
+
+    def solve(self):
+        self.head.solve()
+
+    def predict(self, X, non_negative=True):
+        return self.head.predict(
+            (np.asarray(X) - self.mu) / self.sd, non_negative=non_negative
+        )
 
 
 def feature_standardizer(domains, t=0):
@@ -97,6 +123,28 @@ def run_single_domain(domains, patch_target, alpha, lam):
     return float(np.mean(rels)), rels
 
 
+def run_closed_form_image_seq(domains, lam, proj_dim=0):
+    """Matched image-only f=1 baseline; differs from SGD only in optimizer."""
+    T = domains.n_domains()
+    d_in = _first_dim(domains)
+    mu, sd = feature_standardizer(domains, 0)
+    image_head = StandardizedClosedFormHead(d_in, lam, mu, sd, proj_dim=proj_dim)
+    dummy_patch = LinHead(d_in, mu, sd)
+    scales = [domain_scale(domains, t, "mean") for t in range(T)]
+    matrix = np.full((T, T), np.nan)
+    for t in range(T):
+        image_head.begin_task(1.0)
+        for X, Y, _ in domains.stream("train", t):
+            image_head.accumulate(_image_feature(X), _image_target(Y) / scales[t])
+        image_head.solve()
+        for previous in range(t + 1):
+            _, matrix[t, previous] = eval_domain(
+                domains, previous, dummy_patch, image_head, 0.0, scales[previous]
+            )
+    final, nbwt = matrix_metrics(matrix)
+    return final, nbwt, matrix.tolist()
+
+
 def run_sgd_seq(domains, patch_target, alpha, lam, epochs, lr, l2):
     """Sequential ADAM linear probe at the IMAGE level (predict normalized total).
     The dense patch head is ill-conditioned for gradient training (per-patch errors
@@ -137,9 +185,11 @@ def main():
     ap.add_argument("--img-size", type=int, default=518)
     ap.add_argument("--backbone", default="vit_base_patch14_dinov2.lvd142m")
     ap.add_argument("--max-per-domain", type=int, default=400)
+    ap.add_argument("--sample-seed", type=int, default=42)
     ap.add_argument("--sgd-epochs", type=int, default=10)
     ap.add_argument("--sgd-lr", type=float, default=0.01)   # Adam lr
     ap.add_argument("--sgd-l2", type=float, default=1e-4)
+    ap.add_argument("--ranpac-dim", type=int, default=2000)
     ap.add_argument("--out", default="runs_real/base")
     a = ap.parse_args()
 
@@ -147,18 +197,28 @@ def main():
     with open(a.config) as f:
         cfg = json.load(f)
     domains = RealCountingDomains(build_from_config(cfg), backbone=a.backbone,
-                                 img_size=a.img_size, max_per_domain=a.max_per_domain)
+                                 img_size=a.img_size, max_per_domain=a.max_per_domain,
+                                 sample_seed=a.sample_seed)
+    data_manifest = domains.data_manifest()
 
     t0 = time.time()
-    # f1 (== joint upper bound for analytic CL) via the shared closed-form path
+    # f1 (== matched centralized ridge, not a task-performance upper bound)
     _, f1_rel, _, f1_M, _ = train_eval(domains, a.patch_target, 1.0, a.alpha, a.lam, "mean")
     f1_final, f1_nbwt = matrix_metrics(np.asarray(f1_M))
     sd_final, sd_rels = run_single_domain(domains, a.patch_target, a.alpha, a.lam)
+    cf_image_final, cf_image_nbwt, cf_image_M = run_closed_form_image_seq(
+        domains, a.lam, proj_dim=0
+    )
+    ranpac_image_final, ranpac_image_nbwt, ranpac_image_M = run_closed_form_image_seq(
+        domains, a.lam, proj_dim=a.ranpac_dim
+    )
     sgd_final, sgd_nbwt, sgd_M = run_sgd_seq(
         domains, a.patch_target, a.alpha, a.lam, a.sgd_epochs, a.sgd_lr, a.sgd_l2)
 
     rows = [
-        ("cf_f1 (=joint上界)", f1_final, f1_nbwt),
+        ("cf_f1 (=matched joint)", f1_final, f1_nbwt),
+        ("cf_f1_image (matched)", cf_image_final, cf_image_nbwt),
+        ("ranpac-style image", ranpac_image_final, ranpac_image_nbwt),
         ("single-domain",     sd_final, float("nan")),
         ("sgd_seq(image)",    sgd_final, sgd_nbwt),
     ]
@@ -171,12 +231,24 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "baselines.json"), "w") as fh:
-        json.dump(dict(config=a.config, alpha=a.alpha, patch_target=a.patch_target,
+        payload = dict(config=a.config, alpha=a.alpha, patch_target=a.patch_target,
                        lam=a.lam, sgd=dict(epochs=a.sgd_epochs, lr=a.sgd_lr, l2=a.sgd_l2),
-                       cf_f1=dict(final_avg_rel=f1_final, nBwT=f1_nbwt),
+                       data_manifest=data_manifest,
+                       cf_f1_full=dict(final_avg_rel=f1_final, nBwT=f1_nbwt,
+                                       M_rel=f1_M),
+                       cf_f1_image=dict(final_avg_rel=cf_image_final, nBwT=cf_image_nbwt,
+                                        M_rel=cf_image_M),
+                       ranpac_style_image=dict(
+                                         note="Gaussian random projection + ReLU + ridge; "
+                                              "not the full RanPAC classifier",
+                                         proj_dim=a.ranpac_dim,
+                                         final_avg_rel=ranpac_image_final,
+                                         nBwT=ranpac_image_nbwt,
+                                         M_rel=ranpac_image_M),
                        single_domain=dict(final_avg_rel=sd_final, per_domain=sd_rels),
-                       sgd_seq=dict(final_avg_rel=sgd_final, nBwT=sgd_nbwt, M_rel=sgd_M)),
-                  fh, indent=2, ensure_ascii=False)
+                       sgd_seq=dict(final_avg_rel=sgd_final, nBwT=sgd_nbwt, M_rel=sgd_M))
+        json.dump(with_provenance(payload, a.config, vars(a)), fh,
+                  indent=2, ensure_ascii=False)
     print(f"\nsaved -> {os.path.join(a.out, 'baselines.json')}  ({time.time()-t0:.1f}s)")
 
 

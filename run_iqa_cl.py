@@ -18,7 +18,9 @@ import time
 import numpy as np
 
 from adaptive_selector import BalancedSufficientStatsSelector
+from evaluation_metrics import balanced_metric_mean, scalar_regression_metrics
 from rls_head import ForgettingRidgeRLS
+from run_adaptive_f import classify_adaptive_result
 from run_provenance import with_provenance
 from metrics import forgetting_matrix_stats
 
@@ -49,6 +51,21 @@ def aug(X):
     return np.concatenate([X, np.ones((X.shape[0], 1))], axis=1)
 
 
+def final_task_metrics(head, te, domain_scales, predict=None):
+    per_domain = []
+    for domain in te:
+        X, target = te[domain]
+        prediction = (
+            predict(X, domain)
+            if predict is not None
+            else head.predict(X)[:, 0] * domain_scales[domain]
+        )
+        row = scalar_regression_metrics(prediction, target)
+        row["domain_index"] = domain
+        per_domain.append(row)
+    return {"per_domain": per_domain, "balanced": balanced_metric_mean(per_domain)}
+
+
 def train_eval(tr, te, forget, lam, mode, proj_dim=0):
     T = len(tr); d = tr[0][0].shape[1]; s = scales(tr, mode)
     head = ForgettingRidgeRLS(d_in=d, d_out=1, lam=lam, forget=forget, proj_dim=proj_dim)
@@ -59,13 +76,13 @@ def train_eval(tr, te, forget, lam, mode, proj_dim=0):
         for i in range(t + 1):
             Xt, yt = te[i]; pred = head.predict(Xt)[:, 0] * s[i]
             M[t, i] = rel_mae(pred, yt)
-    return float(np.nanmean(M[T - 1, :T])), M
+    return float(np.nanmean(M[T - 1, :T])), M, final_task_metrics(head, te, s)
 
 
 def sweep(tr, te, forgets, lam, mode):
     rows = []; best = (1.0, 1e18)
     for f in forgets:
-        r, _ = train_eval(tr, te, f, lam, mode)
+        r, _, _ = train_eval(tr, te, f, lam, mode)
         rows.append((f, r))
         if r < best[1]: best = (f, r)
     return best, rows
@@ -78,7 +95,7 @@ def adaptive(
     mode,
     sel_grid,
     val_every=5,
-    search_mode="continuous",
+    search_mode="grid",
     abstain_relative_gain=1e-4,
 ):
     T = len(tr); d = tr[0][0].shape[1]; d_aug = d + 1; s = scales(tr, mode)
@@ -87,7 +104,7 @@ def adaptive(
         d_aug, lam, search_mode=search_mode, grid=sel_grid,
         abstain_relative_gain=abstain_relative_gain,
     )
-    f_used, drift_scores = [], []
+    f_used, drift_scores, selections = [], [], []
     M = np.full((T, T), np.nan)
     for t in range(T):
         X, y = tr[t]; yn = (y / s[t]).reshape(-1, 1); Xa = aug(X)
@@ -100,10 +117,27 @@ def adaptive(
         f_t = selection.factor
         f_used.append(f_t)
         drift_scores.append(selection.drift_score)
+        selections.append(
+            {
+                "domain_index": t,
+                "factor": selection.factor,
+                "objective": selection.objective,
+                "objective_f1": selection.objective_f1,
+                "drift_score": selection.drift_score,
+            }
+        )
         head.begin_task(f_t); head.accumulate(X, yn); head.solve()
         for i in range(t + 1):
             Xt, yt = te[i]; pred = head.predict(Xt)[:, 0] * s[i]; M[t, i] = rel_mae(pred, yt)
-    return float(np.nanmean(M[T - 1, :T])), f_used, drift_scores, selector.state_bytes
+    return (
+        float(np.nanmean(M[T - 1, :T])),
+        f_used,
+        drift_scores,
+        selector.state_bytes,
+        M.tolist(),
+        final_task_metrics(head, te, s),
+        selections,
+    )
 
 
 def vff_iqa(tr, te, lam, mode, gamma=1.5, xi=1e-6, f_min=0.05, val_every=5):
@@ -138,17 +172,29 @@ def vff_iqa(tr, te, lam, mode, gamma=1.5, xi=1e-6, f_min=0.05, val_every=5):
         head.begin_task(f_t); head.accumulate(X, yn); head.solve()
         for i in range(t + 1):
             Xt, yt = te[i]; pred = head.predict(Xt)[:, 0] * s[i]; M[t, i] = rel_mae(pred, yt)
-    return float(np.nanmean(M[T - 1, :T])), f_used
+    return (
+        float(np.nanmean(M[T - 1, :T])),
+        f_used,
+        M.tolist(),
+        final_task_metrics(head, te, s),
+    )
 
 
 def single_domain(tr, te, lam, mode):
-    s = scales(tr, mode); rels = []
+    s = scales(tr, mode); rels = []; task_metrics = []
     for t in tr:
         d = tr[t][0].shape[1]
         h = ForgettingRidgeRLS(d_in=d, d_out=1, lam=lam); h.begin_task()
         X, y = tr[t]; h.accumulate(X, (y / s[t]).reshape(-1, 1)); h.solve()
-        Xt, yt = te[t]; rels.append(rel_mae(h.predict(Xt)[:, 0] * s[t], yt))
-    return float(np.mean(rels))
+        Xt, yt = te[t]; prediction = h.predict(Xt)[:, 0] * s[t]
+        rels.append(rel_mae(prediction, yt))
+        row = scalar_regression_metrics(prediction, yt)
+        row["domain_index"] = t
+        task_metrics.append(row)
+    return float(np.mean(rels)), {
+        "per_domain": task_metrics,
+        "balanced": balanced_metric_mean(task_metrics),
+    }
 
 
 def sgd_seq(tr, te, mode, epochs=15, lr=0.01, l2=1e-4):
@@ -167,7 +213,13 @@ def sgd_seq(tr, te, mode, epochs=15, lr=0.01, l2=1e-4):
             W -= lr * (m / (1 - b1 ** step)) / (np.sqrt(v / (1 - b2 ** step)) + eps)
         for i in range(t + 1):
             Xt, yt = te[i]; pred = (feat(Xt) @ W)[:, 0] * s[i]; M[t, i] = rel_mae(pred, yt)
-    return float(np.nanmean(M[T - 1, :T]))
+    metrics = final_task_metrics(
+        None,
+        te,
+        s,
+        predict=lambda X, domain: (feat(X) @ W)[:, 0] * s[domain],
+    )
+    return float(np.nanmean(M[T - 1, :T])), M.tolist(), metrics
 
 
 def main():
@@ -179,7 +231,13 @@ def main():
     ap.add_argument("--backbone", default="dinov2_vitb14")
     ap.add_argument("--max-per-domain", type=int, default=500)
     ap.add_argument("--ranpac-dim", type=int, default=2000)
-    ap.add_argument("--selector-search", choices=["continuous", "grid"], default="continuous")
+    ap.add_argument(
+        "--selector-search",
+        choices=["continuous", "grid"],
+        default="grid",
+        help="grid is the paper default because the selector objective is not "
+             "proven unimodal",
+    )
     ap.add_argument("--abstain-relative-gain", type=float, default=1e-4)
     ap.add_argument("--out", default="runs_real/kadid")
     a = ap.parse_args()
@@ -202,32 +260,71 @@ def main():
     for mode in ("none", "mean"):
         (bf, br), rows = sweep(tr, te, forgets, a.lam, mode)
         res[f"opt_f_{mode}"] = bf; res[f"opt_rel_{mode}"] = br
+        res[f"sweep_{mode}"] = [
+            {"factor": factor, "rel_MAE": score} for factor, score in rows
+        ]
         print(f"  [{mode:4s}] best f = {bf:g}  rel = {br:.4f}   sweep=" +
               " ".join(f"{f:g}:{r:.3f}" for f, r in rows))
     f_mean = res["opt_f_mean"]
-    verdict = (f"归一化后最优 f={f_mean:g}{'<1 → 遗忘有效（真实漂移）' if f_mean < 0.9 else '≈1 → 无需遗忘（量级假象或无漂移）'}")
-    res["verdict"] = verdict
-    print("  VERDICT:", verdict)
+    normalization_interpretation = (
+        f"归一化后最优 f={f_mean:g}"
+        + (
+            "<1：存在可由历史降权缓解的残余负迁移，但不能单凭此证明概念漂移"
+            if f_mean < 0.9
+            else "≈1：固定因子扫描未显示遗忘收益"
+        )
+    )
+    res["normalization_interpretation"] = normalization_interpretation
+    print("  INTERPRETATION:", normalization_interpretation)
 
     print("\n=== adaptive f / baselines (normalized regime, rel MAE) ===")
-    rel_f1, _ = train_eval(tr, te, 1.0, a.lam, "mean")
-    rel_ad, f_used, drift_scores, selector_state_bytes = adaptive(
+    rel_f1, f1_matrix, f1_metrics = train_eval(tr, te, 1.0, a.lam, "mean")
+    (
+        rel_ad,
+        f_used,
+        drift_scores,
+        selector_state_bytes,
+        adaptive_matrix,
+        adaptive_metrics,
+        selection_records,
+    ) = adaptive(
         tr, te, a.lam, "mean", sel_grid,
         search_mode=a.selector_search,
         abstain_relative_gain=a.abstain_relative_gain,
     )
-    rel_sd = single_domain(tr, te, a.lam, "mean")
-    rel_rp, _ = train_eval(tr, te, 1.0, a.lam, "mean", proj_dim=a.ranpac_dim)
-    rel_sgd = sgd_seq(tr, te, "mean")
-    rel_vff, vff_f_used = vff_iqa(tr, te, a.lam, "mean")
+    rel_sd, single_metrics = single_domain(tr, te, a.lam, "mean")
+    rel_rp, ranpac_matrix, ranpac_metrics = train_eval(
+        tr, te, 1.0, a.lam, "mean", proj_dim=a.ranpac_dim
+    )
+    rel_sgd, sgd_matrix, sgd_metrics = sgd_seq(tr, te, "mean")
+    rel_vff, vff_f_used, vff_matrix, vff_metrics = vff_iqa(
+        tr, te, a.lam, "mean"
+    )
+    verdict = classify_adaptive_result(
+        rel_f1,
+        res["opt_rel_mean"],
+        rel_ad,
+        f_used,
+    )
     res.update(dict(f1=rel_f1, adaptive=rel_ad, f_used=f_used,
                     drift_scores=drift_scores, selector_search=a.selector_search,
                     selector_state_bytes=selector_state_bytes, single=rel_sd,
-                    ranpac=rel_rp, vff=rel_vff, vff_f_used=vff_f_used, sgd=rel_sgd))
-    print(f"  f1 (=joint)        rel = {rel_f1:.4f}")
+                    ranpac_style=rel_rp, vff=rel_vff,
+                    vff_f_used=vff_f_used, sgd=rel_sgd,
+                    verdict=verdict,
+                    evaluation=dict(
+                        f1={"M_rel": f1_matrix.tolist(), **f1_metrics},
+                        adaptive={"M_rel": adaptive_matrix, **adaptive_metrics},
+                        ranpac_style={"M_rel": ranpac_matrix.tolist(), **ranpac_metrics},
+                        vff={"M_rel": vff_matrix, **vff_metrics},
+                        single=single_metrics,
+                        sgd={"M_rel": sgd_matrix, **sgd_metrics},
+                    ),
+                    selection_records=selection_records))
+    print(f"  f1 (=matched joint ridge) rel = {rel_f1:.4f}")
     print(f"  adaptive f         rel = {rel_ad:.4f}   f_used={[round(x,2) for x in f_used]}")
     print(f"  single-domain      rel = {rel_sd:.4f}")
-    print(f"  RanPAC(proj={a.ranpac_dim},f=1) rel = {rel_rp:.4f}")
+    print(f"  RanPAC-style(proj={a.ranpac_dim},f=1) rel = {rel_rp:.4f}")
     print(f"  VFF-RLS(Paleologu) rel = {rel_vff:.4f}   f_used={[round(x,2) for x in vff_f_used]}")
     print(f"  SGD-seq(Adam)      rel = {rel_sgd:.4f}")
     print(f"  -> adaptive vs f1: {(rel_f1-rel_ad)/max(rel_f1,1e-9)*100:+.1f}%")

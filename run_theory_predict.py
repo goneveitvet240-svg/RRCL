@@ -32,7 +32,7 @@ import numpy as np
 from rls_head import ForgettingRidgeRLS
 
 
-def load_task(cfg, task, backbone, img_size, mpd):
+def load_task(cfg, task, backbone, img_size, mpd, sample_seed=42):
     if task == "age":
         from datasets_age import AgeDomains, build_age_config
         dom = AgeDomains(build_age_config(cfg), backbone=backbone, img_size=img_size, max_per_domain=mpd)
@@ -43,7 +43,13 @@ def load_task(cfg, task, backbone, img_size, mpd):
             return np.asarray(Xs), np.asarray(ys)
     else:
         from datasets_real import RealCountingDomains, build_from_config
-        dom = RealCountingDomains(build_from_config(cfg), backbone=backbone, img_size=img_size, max_per_domain=mpd)
+        dom = RealCountingDomains(
+            build_from_config(cfg),
+            backbone=backbone,
+            img_size=img_size,
+            max_per_domain=mpd,
+            sample_seed=sample_seed,
+        )
         def arr(split, t):
             Xs, ys = [], []
             for X, Y, _ in dom.stream(split, t):
@@ -123,6 +129,7 @@ def main():
     ap.add_argument("--img-size", type=int, default=518)
     ap.add_argument("--backbone", default="vit_base_patch14_dinov2.lvd142m")
     ap.add_argument("--max-per-domain", type=int, default=400)
+    ap.add_argument("--sample-seed", type=int, default=42)
     ap.add_argument("--var-gain", type=float, default=1.0)
     ap.add_argument("--csv", default="runs_real/theory_points.csv")
     a = ap.parse_args()
@@ -131,7 +138,14 @@ def main():
 
     with open(a.config) as f:
         cfg = json.load(f)
-    tr, te, names = load_task(cfg, a.task, a.backbone, a.img_size, a.max_per_domain)
+    tr, te, names = load_task(
+        cfg,
+        a.task,
+        a.backbone,
+        a.img_size,
+        a.max_per_domain,
+        sample_seed=a.sample_seed,
+    )
     pd, d_aug = estimate(tr, a.lam)
     fp, _ = f_pred(pd, d_aug, a.lam, grid, gain=a.var_gain)
     fo, relo, _ = f_oracle(tr, te, forgets, a.lam)

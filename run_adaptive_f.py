@@ -37,7 +37,9 @@ import os
 import time
 import numpy as np
 
+from adaptive_selector import BalancedSufficientStatsSelector
 from rls_head import ForgettingRidgeRLS, f_star
+from run_provenance import with_provenance
 from run_real import _first_dim
 from run_real_image_aux import transform_patch_target, _image_feature, _image_target
 from run_real_norm_ablation import domain_scale, eval_domain, train_eval
@@ -105,7 +107,12 @@ def adaptive_train_eval(domains, patch_target, alpha, lam, f_min, f_max, noise_e
         for i in range(t + 1):
             _, M_rel[t, i] = eval_domain(domains, i, patch_head, image_head, alpha, scales[i])
     final_rel = float(np.nanmean(M_rel[T - 1, :T]))
-    return final_rel, f_used, rho_used
+    evidence = {
+        "domain_names": [spec.name for spec in domains.domains],
+        "scales": scales,
+        "M_rel": M_rel.tolist(),
+    }
+    return final_rel, f_used, rho_used, evidence
 
 
 def _aug_raw(X):
@@ -130,44 +137,55 @@ def _domain_suffstats_split(domains, t, patch_target, s_t, d_aug, val_every=5):
     return fit, val
 
 
-def adaptive_train_eval_suff(domains, patch_target, alpha, lam, f_min, f_max, sel_grid):
+def adaptive_train_eval_suff(
+    domains,
+    patch_target,
+    alpha,
+    lam,
+    f_min,
+    f_max,
+    sel_grid,
+    search_mode="grid",
+    abstain_relative_gain=1e-4,
+):
     """Select f at each boundary by minimizing HELD-OUT (validation) balanced error
-    over seen domains, via per-domain sufficient stats (exemplar-free). The deployed
-    head still trains on the FULL domain; only f-selection uses the fit/val split."""
+    over seen domains. Historical fit and validation quadratics are accumulated in
+    O(d^2) total state; no per-domain matrices or exemplars are retained. The
+    deployed head still trains on the FULL domain."""
     T = domains.n_domains()
     d_in = _first_dim(domains)
     d_aug = d_in + 1
     patch_head = ForgettingRidgeRLS(d_in=d_in, d_out=1, lam=lam)   # deployed model
     image_head = ForgettingRidgeRLS(d_in=d_in, d_out=1, lam=lam)
-    Rf, Cf, Rv, Cv, Sv, nv = [], [], [], [], [], []
-    scales, f_used, obj_used = [], [], []
+    selector = BalancedSufficientStatsSelector(
+        dimension=d_aug,
+        lam=lam,
+        f_min=f_min,
+        f_max=f_max,
+        search_mode=search_mode,
+        grid=sel_grid,
+        abstain_relative_gain=abstain_relative_gain,
+    )
+    scales, f_used, obj_used, drift_scores, selections = [], [], [], [], []
     M_rel = np.full((T, T), np.nan)
     for t in range(T):
         s_t = domain_scale(domains, t, "mean"); scales.append(s_t)
         fit, val = _domain_suffstats_split(domains, t, patch_target, s_t, d_aug)
-        Rf.append(fit[0]); Cf.append(fit[1])
-        Rv.append(val[0]); Cv.append(val[1]); Sv.append(val[2]); nv.append(val[3])
-        if t == 0:
-            f_t, obj_t = 1.0, None
-        else:
-            best_f, best_obj = 1.0, float("inf")
-            for f in sel_grid:
-                A = lam * np.eye(d_aug); b = np.zeros((d_aug, 1))
-                for d in range(t + 1):
-                    w = f ** (t - d)
-                    A += w * Rf[d]; b += w * Cf[d]
-                W = np.linalg.solve(A, b)                       # fit-only solution
-                errs = []
-                for d in range(t + 1):
-                    quad = float(np.sum(W * (Rv[d] @ W)))       # held-out val SSE
-                    lin = float(np.sum(W * Cv[d]))
-                    sse = quad - 2.0 * lin + Sv[d]
-                    errs.append(sse / max(nv[d], 1))
-                obj = float(np.mean(errs))
-                if obj < best_obj:
-                    best_f, best_obj = float(f), obj
-            f_t, obj_t = float(np.clip(best_f, f_min, f_max)), best_obj
-        f_used.append(f_t); obj_used.append(obj_t)
+        selection = selector.select_and_update(fit, val)
+        f_t = selection.factor
+        f_used.append(f_t)
+        obj_used.append(selection.objective)
+        drift_scores.append(selection.drift_score)
+        selections.append(
+            {
+                "domain": domains.domains[t].name,
+                "factor": selection.factor,
+                "objective": selection.objective,
+                "objective_f1": selection.objective_f1,
+                "drift_score": selection.drift_score,
+                "search_mode": selection.search_mode,
+            }
+        )
         patch_head.begin_task(f_t); image_head.begin_task(f_t)
         for X, Y, _ in domains.stream("train", t):
             py = transform_patch_target(Y, patch_target) / s_t
@@ -177,7 +195,82 @@ def adaptive_train_eval_suff(domains, patch_target, alpha, lam, f_min, f_max, se
         for i in range(t + 1):
             _, M_rel[t, i] = eval_domain(domains, i, patch_head, image_head, alpha, scales[i])
     final_rel = float(np.nanmean(M_rel[T - 1, :T]))
-    return final_rel, f_used, obj_used
+    evidence = {
+        "domain_names": [spec.name for spec in domains.domains],
+        "scales": scales,
+        "M_rel": M_rel.tolist(),
+        "selections": selections,
+    }
+    return (
+        final_rel,
+        f_used,
+        obj_used,
+        drift_scores,
+        selector.state_bytes,
+        evidence,
+    )
+
+
+def classify_adaptive_result(
+    rel_f1,
+    oracle_rel,
+    adaptive_rel,
+    f_used,
+    absolute_tolerance=1e-4,
+    min_oracle_recovery=0.8,
+):
+    """Classify selector behavior without calling a missed oracle gain "GOOD".
+
+    The fixed-factor oracle is diagnostic and test-selected.  Its gain over
+    f=1 defines how much recoverable signal exists in this particular sweep.
+    When that gain is material, a selector only counts as successful if it
+    recovers the requested fraction of it.
+    """
+    rel_f1 = float(rel_f1)
+    oracle_rel = float(oracle_rel)
+    adaptive_rel = float(adaptive_rel)
+    tolerance = float(absolute_tolerance)
+    oracle_gain = max(rel_f1 - oracle_rel, 0.0)
+    adaptive_gain = rel_f1 - adaptive_rel
+    all_absolute_memory = all(abs(float(factor) - 1.0) <= 1e-9 for factor in f_used)
+
+    if adaptive_gain < -tolerance:
+        status = "worse_than_f1"
+        success = False
+        recovery = (
+            adaptive_gain / oracle_gain if oracle_gain > tolerance else None
+        )
+    elif oracle_gain <= tolerance:
+        recovery = None
+        if all_absolute_memory:
+            status = "correct_abstention_no_fixed_oracle_gain"
+            success = True
+        else:
+            status = "neutral_but_unnecessary_forgetting"
+            success = False
+    else:
+        recovery = adaptive_gain / oracle_gain
+        if adaptive_gain <= tolerance:
+            status = "missed_fixed_oracle_gain"
+            success = False
+        elif recovery >= min_oracle_recovery:
+            status = "captures_fixed_oracle_gain"
+            success = True
+        else:
+            status = "partial_fixed_oracle_gain"
+            success = False
+
+    return {
+        "status": status,
+        "success": success,
+        "oracle_gain_abs": oracle_gain,
+        "adaptive_gain_abs": adaptive_gain,
+        "oracle_gain_recovery": recovery,
+        "all_absolute_memory": all_absolute_memory,
+        "absolute_tolerance": tolerance,
+        "min_oracle_recovery": float(min_oracle_recovery),
+        "oracle_is_test_selected_diagnostic": True,
+    }
 
 
 def main():
@@ -190,12 +283,23 @@ def main():
     ap.add_argument("--img-size", type=int, default=518)
     ap.add_argument("--backbone", default="vit_base_patch14_dinov2.lvd142m")
     ap.add_argument("--max-per-domain", type=int, default=400)
+    ap.add_argument("--sample-seed", type=int, default=42)
     ap.add_argument("--f-min", type=float, default=0.05)
     ap.add_argument("--f-max", type=float, default=1.0)
     ap.add_argument("--noise-ema", type=float, default=0.5)
     ap.add_argument("--selector", choices=["sufficient", "innovation"], default="sufficient",
                     help="sufficient = suff-stat balanced-error search (recommended); "
                          "innovation = f_star(rho) heuristic")
+    ap.add_argument(
+        "--selector-search",
+        choices=["continuous", "grid"],
+        default="grid",
+        help="grid is the paper default because the objective is not proven unimodal; "
+             "continuous is an ablation with coarse-grid initialization",
+    )
+    ap.add_argument("--abstain-relative-gain", type=float, default=1e-4)
+    ap.add_argument("--verdict-absolute-tolerance", type=float, default=1e-4)
+    ap.add_argument("--min-oracle-recovery", type=float, default=0.8)
     ap.add_argument("--out", default="runs_real/adaptf")
     a = ap.parse_args()
 
@@ -205,46 +309,94 @@ def main():
     with open(a.config) as f:
         cfg = json.load(f)
     domains = RealCountingDomains(build_from_config(cfg), backbone=a.backbone,
-                                 img_size=a.img_size, max_per_domain=a.max_per_domain)
+                                 img_size=a.img_size, max_per_domain=a.max_per_domain,
+                                 sample_seed=a.sample_seed)
+    data_manifest = domains.data_manifest()
 
     t0 = time.time()
     # all in NORMALIZED accumulation regime (mean), the honest setting
-    _, rel_f1, _, _, _ = train_eval(domains, a.patch_target, 1.0, a.alpha, a.lam, "mean")
+    _, rel_f1, _, f1_matrix, f1_scales = train_eval(
+        domains, a.patch_target, 1.0, a.alpha, a.lam, "mean"
+    )
     best_f, best_rel = None, float("inf")
+    oracle_curve = []
     for f in forgets:
         _, rel, _, _, _ = train_eval(domains, a.patch_target, f, a.alpha, a.lam, "mean")
+        oracle_curve.append({"factor": f, "rel_MAE": rel})
         print(f"[oracle scan f={f:<4g}] rel_MAE={rel:.4f}")
         if rel < best_rel:
             best_f, best_rel = f, rel
     if a.selector == "sufficient":
         sel_grid = np.round(np.arange(0.05, 1.0001, 0.05), 3)
-        rel_ad, f_used, rho_used = adaptive_train_eval_suff(
-            domains, a.patch_target, a.alpha, a.lam, a.f_min, a.f_max, sel_grid)
+        (
+            rel_ad,
+            f_used,
+            selector_objectives,
+            drift_scores,
+            selector_state_bytes,
+            adaptive_evidence,
+        ) = (
+            adaptive_train_eval_suff(
+                domains,
+                a.patch_target,
+                a.alpha,
+                a.lam,
+                a.f_min,
+                a.f_max,
+                sel_grid,
+                search_mode=a.selector_search,
+                abstain_relative_gain=a.abstain_relative_gain,
+            )
+        )
+        rho_used = None
     else:
-        rel_ad, f_used, rho_used = adaptive_train_eval(
+        rel_ad, f_used, rho_used, adaptive_evidence = adaptive_train_eval(
             domains, a.patch_target, a.alpha, a.lam, a.f_min, a.f_max, a.noise_ema)
+        selector_objectives = None
+        drift_scores = rho_used
+        selector_state_bytes = None
 
     gap_to_oracle = rel_ad - best_rel
     improve_over_f1 = (rel_f1 - rel_ad) / max(rel_f1, 1e-12) * 100.0
+    verdict = classify_adaptive_result(
+        rel_f1,
+        best_rel,
+        rel_ad,
+        f_used,
+        absolute_tolerance=a.verdict_absolute_tolerance,
+        min_oracle_recovery=a.min_oracle_recovery,
+    )
 
     print("\n===== ADAPTIVE f RESULT (normalized regime) =====")
     print(f"  f=1 (absolute memory)   rel_MAE = {rel_f1:.4f}")
     print(f"  oracle best fixed f={best_f:<4g} rel_MAE = {best_rel:.4f}")
     print(f"  adaptive f              rel_MAE = {rel_ad:.4f}   (f_used={[round(x,2) for x in f_used]})")
     print(f"  -> adaptive vs f=1: {improve_over_f1:+.1f}%   gap-to-oracle: {gap_to_oracle:+.4f}")
-    if rel_ad <= rel_f1 + 1e-4 and gap_to_oracle <= 0.03:
-        print("  VERDICT: adaptive ~= oracle and does not lose to f=1  -> GOOD")
-    elif rel_ad > rel_f1 + 1e-4:
-        print("  VERDICT: adaptive WORSE than f=1 -> over/under-forgetting; tune f_min/noise_ema")
-    else:
-        print("  VERDICT: adaptive beats f=1 but gap-to-oracle large -> calibrate f_star mapping")
+    recovery = verdict["oracle_gain_recovery"]
+    recovery_text = "n/a" if recovery is None else f"{100.0 * recovery:.1f}%"
+    print(
+        f"  VERDICT: {verdict['status']} | success={verdict['success']} | "
+        f"fixed-oracle gain recovery={recovery_text}"
+    )
 
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "adaptive_f.json"), "w") as fh:
-        json.dump(dict(config=a.config, rel_f1=rel_f1, oracle_f=best_f, oracle_rel=best_rel,
+        payload = dict(config=a.config, rel_f1=rel_f1, oracle_f=best_f, oracle_rel=best_rel,
                        adaptive_rel=rel_ad, f_used=f_used, rho_used=rho_used,
-                       improve_over_f1_pct=improve_over_f1, gap_to_oracle=gap_to_oracle),
-                  fh, indent=2, ensure_ascii=False)
+                       selector=a.selector, selector_search=a.selector_search,
+                       selector_objectives=selector_objectives, drift_scores=drift_scores,
+                       selector_state_bytes=selector_state_bytes,
+                       adaptive_evidence=adaptive_evidence,
+                       f1_evidence=dict(
+                           domain_names=[spec.name for spec in domains.domains],
+                           scales=f1_scales,
+                           M_rel=f1_matrix,
+                       ),
+                       fixed_oracle_curve=oracle_curve,
+                       data_manifest=data_manifest,
+                       improve_over_f1_pct=improve_over_f1, gap_to_oracle=gap_to_oracle,
+                       verdict=verdict)
+        json.dump(with_provenance(payload, a.config, vars(a)), fh, indent=2, ensure_ascii=False)
     print(f"\nsaved -> {os.path.join(a.out, 'adaptive_f.json')}  ({time.time()-t0:.1f}s)")
 
 

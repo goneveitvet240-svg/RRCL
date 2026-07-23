@@ -40,6 +40,7 @@ from rls_head import ForgettingRidgeRLS
 from metrics import mae
 from run_real import _first_dim
 from run_real_image_aux import transform_patch_target, _image_feature, _image_target
+from run_provenance import with_provenance
 
 
 def domain_scale(domains, t, mode):
@@ -101,6 +102,7 @@ def main():
     ap.add_argument("--img-size", type=int, default=518)
     ap.add_argument("--backbone", default="vit_base_patch14_dinov2.lvd142m")
     ap.add_argument("--max-per-domain", type=int, default=400)
+    ap.add_argument("--sample-seed", type=int, default=42)
     ap.add_argument("--target-norms", default="none,mean")
     ap.add_argument("--out", default="runs_real/normabl")
     a = ap.parse_args()
@@ -112,7 +114,9 @@ def main():
     with open(a.config) as f:
         cfg = json.load(f)
     domains = RealCountingDomains(build_from_config(cfg), backbone=a.backbone,
-                                 img_size=a.img_size, max_per_domain=a.max_per_domain)
+                                 img_size=a.img_size, max_per_domain=a.max_per_domain,
+                                 sample_seed=a.sample_seed)
+    data_manifest = domains.data_manifest()
 
     t0 = time.time()
     results = {}
@@ -135,9 +139,11 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     with open(os.path.join(a.out, "norm_ablation.json"), "w") as fh:
-        json.dump(dict(config=a.config, alpha=a.alpha, patch_target=a.patch_target,
-                       lam=a.lam, forgets=forgets, summary=summary, results=results),
-                  fh, indent=2, ensure_ascii=False)
+        payload = dict(config=a.config, alpha=a.alpha, patch_target=a.patch_target,
+                       lam=a.lam, forgets=forgets, summary=summary, results=results,
+                       data_manifest=data_manifest)
+        json.dump(with_provenance(payload, a.config, vars(a)), fh,
+                  indent=2, ensure_ascii=False)
 
     # verdict
     print("\n===== VERDICT (decisive read-off) =====")

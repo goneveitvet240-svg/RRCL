@@ -3,21 +3,24 @@
     {
       "name": "JHU",
       "kind": "jhu",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/JHU_CROWD/jhu_crowd_v2.0/jhu_crowd_v2.0",
+      "root": "/root/autodl-tmp/datasets/JHU_official_download/jhu_crowd_v2.0",
+      "sample_key": "JHU-v2.0",
       "train_split": "train",
       "test_split": "val"
     },
     {
       "name": "SHA",
       "kind": "shanghai",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_A",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_A",
+      "sample_key": "ShanghaiTech-A",
       "train_split": "train",
       "test_split": "test"
     },
     {
       "name": "SHB",
       "kind": "shanghai",
-      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/aistudio_st/part_B",
+      "root": "/root/autodl-tmp/datasets/ShanghaiTech/ShanghaiTech/part_B",
+      "sample_key": "ShanghaiTech-B",
       "train_split": "train",
       "test_split": "test"
     }
