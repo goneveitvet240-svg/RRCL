@@ -3,8 +3,9 @@
 # result archive for paper tables/figures.
 #
 # Recommended launch on AutoDL:
-#   cd /root/recursive_ridge_cl_autodl_min
-#   nohup bash run_paper_closure_all.sh > runs_real/run_paper_closure_all.nohup 2>&1 &
+#   cd /root/autodl-tmp/RRCL
+#   nohup bash scripts/run_paper_closure_all.sh \
+#     > runs_real/run_paper_closure_all.nohup 2>&1 &
 #
 # The script runs sequentially to avoid IO/GPU contention.
 set -euo pipefail

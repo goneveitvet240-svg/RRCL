@@ -24,6 +24,21 @@ REQUIRED_RUNNERS = [
     "run_theory_predict.py",
 ]
 
+PAPER_CONFIGS = [
+    *(f"domains_{name}.json" for name in REORDER_CONFIGS),
+    "domains_qnrf_sha_shb.json",
+    "domains_qnrf_shb_sha.json",
+    "domains_sha_shb_qnrf.json",
+    "domains_age_utk_young_old.json",
+    "domains_age_agedb_utk.json",
+    "domains_age_utk_agedb.json",
+    "domains_iqa_kadid.json",
+    "domains_ava.json",
+    "domains_depth_nyu.json",
+]
+
+DOMAIN_FILE_FIELDS = ("csv", "split_file", "test_split_file")
+
 
 def git_is_clean():
     completed = subprocess.run(
@@ -62,15 +77,31 @@ def main():
         )
 
     if args.check_data:
-        for name in REORDER_CONFIGS:
-            config_path = ROOT / "configs" / f"domains_{name}.json"
+        checked_paths = set()
+        for config_name in PAPER_CONFIGS:
+            config_path = ROOT / "configs" / config_name
+            if not config_path.is_file():
+                failures.append(f"missing paper config: {config_path}")
+                continue
             payload = json.loads(config_path.read_text())
             for domain in payload["domains"]:
                 root = Path(domain["root"])
-                if not root.is_dir():
+                root_key = ("directory", str(root))
+                if root_key not in checked_paths and not root.is_dir():
                     failures.append(
-                        f"missing dataset root for {domain['sample_key']}: {root}"
+                        f"missing dataset root for {domain['name']}: {root}"
                     )
+                checked_paths.add(root_key)
+                for field in DOMAIN_FILE_FIELDS:
+                    if field not in domain:
+                        continue
+                    path = Path(domain[field])
+                    file_key = ("file", str(path))
+                    if file_key not in checked_paths and not path.is_file():
+                        failures.append(
+                            f"missing {field} for {domain['name']}: {path}"
+                        )
+                    checked_paths.add(file_key)
 
     if failures:
         print("RRCL experiment preflight: FAILED")
@@ -86,7 +117,7 @@ def main():
     else:
         print("  git worktree clean")
     if args.check_data:
-        print("  configured dataset roots present")
+        print("  all paper-closure dataset roots and metadata files present")
     return 0
 
 
