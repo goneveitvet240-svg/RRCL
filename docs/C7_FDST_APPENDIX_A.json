@@ -1,0 +1,27 @@
+{
+  "protocol": "C7-fdst-v3",
+  "method_ids": [
+    "f1",
+    "fixed_f_oracle",
+    "shrinkage_gamma",
+    "fstar_pred",
+    "precision_weighting"
+  ],
+  "oracle_grid": [1.0, 0.8, 0.6, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1],
+  "development_source_commits": {
+    "shrinkage_gamma": "bb2e3afe969670f74eee69a4952dbaab8618a8e5",
+    "fstar_pred": "609399ac2039c9f280b61d54206da439ff5a53bc"
+  },
+  "analysis_code_source": "scripts/run_worldexpo_c7.py@18b21be",
+  "dataset_specific_changes": [
+    "FDST loader and JSON annotation parser",
+    "six videos from six reviewed scene identities",
+    "fixed 10-frame temporal blocks",
+    "full-frame targets",
+    "v3 one-percent near-frame coordinate tolerance with explicit clipping audit",
+    "FDST provenance, manifest, and single-shot output gates"
+  ],
+  "frozen_by": "pangwei",
+  "frozen_at": "2026-08-09",
+  "status": "pre-result v3; formal manifest generated for this split-freeze commit; no model access"
+}

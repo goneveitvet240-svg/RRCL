@@ -1,0 +1,7 @@
+{
+  "_note": "对照：UTKFace -> AgeDB（AgeDB 在后）。用于检验顺序不对称是否在年龄上也成立。",
+  "domains": [
+    {"name": "UTK",   "kind": "utkface", "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UTKFace_dl/UTKFace"},
+    {"name": "AgeDB", "kind": "agedb",   "root": "/root/autodl-tmp/pangwei_rrcl/datasets/AgeDB_dl/AgeDB"}
+  ]
+}

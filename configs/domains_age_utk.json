@@ -1,0 +1,25 @@
+{
+  "domains": [
+    {
+      "name": "UTK-Young",
+      "kind": "utkface",
+      "root": "/root/autodl-tmp/datasets/UTKFace/crop_part1",
+      "age_min": 1,
+      "age_max": 35
+    },
+    {
+      "name": "UTK-Mid",
+      "kind": "utkface",
+      "root": "/root/autodl-tmp/datasets/UTKFace/crop_part1",
+      "age_min": 36,
+      "age_max": 60
+    },
+    {
+      "name": "UTK-Old",
+      "kind": "utkface",
+      "root": "/root/autodl-tmp/datasets/UTKFace/crop_part1",
+      "age_min": 61,
+      "age_max": 116
+    }
+  ]
+}

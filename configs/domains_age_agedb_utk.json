@@ -1,0 +1,7 @@
+{
+  "_note": "跨数据集漂移：AgeDB(历史/名人脸) -> UTKFace(网络脸)。AgeDB 在前。预期若有真漂移，归一化后仍 f<1（类比 JHU-first）。",
+  "domains": [
+    {"name": "AgeDB", "kind": "agedb",   "root": "/root/autodl-tmp/pangwei_rrcl/datasets/AgeDB_dl/AgeDB"},
+    {"name": "UTK",   "kind": "utkface", "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UTKFace_dl/UTKFace"}
+  ]
+}

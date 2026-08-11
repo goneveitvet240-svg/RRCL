@@ -1,0 +1,80 @@
+{
+  "schema_version": "rrcl-tmlr-synthetic-config-v1",
+  "protocol": "rrcl-tmlr-synthetic-v1",
+  "dimensions": {
+    "domains": 4,
+    "features": 8,
+    "n_train_per_domain": 512,
+    "n_test_per_domain": 4096
+  },
+  "ridge_lambda": 1.0,
+  "method_roster": [
+    "f1",
+    "fixed_f_oracle",
+    "fstar_pred",
+    "precision_weighting",
+    "shrinkage_gamma",
+    "vff_rls"
+  ],
+  "secondary_methods": {
+    "SIFt": "not computationally matched before the v1 runner freeze",
+    "DOS-ELM": "not computationally matched before the v1 runner freeze"
+  },
+  "split_fractions": {
+    "fit": 0.6,
+    "precision": 0.2,
+    "gamma": 0.2
+  },
+  "factor_grid": [
+    0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+    0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0
+  ],
+  "gamma_grid": [
+    0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+    0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0
+  ],
+  "seeds": [
+    2026080701, 2026080702, 2026080703, 2026080704, 2026080705,
+    2026080706, 2026080707, 2026080708, 2026080709, 2026080710
+  ],
+  "orders": {
+    "forward": [0, 1, 2, 3],
+    "reverse": [3, 2, 1, 0]
+  },
+  "factor_levels": {
+    "label_scale": {
+      "off": [1.0, 1.0, 1.0, 1.0],
+      "on": [0.5, 1.0, 2.0, 4.0]
+    },
+    "reliability": {
+      "off": [1.0, 1.0, 1.0, 1.0],
+      "on": [0.25, 0.5, 1.0, 2.0]
+    },
+    "mapping_change": {
+      "amplitude": 0.8,
+      "coefficients": [-0.75, -0.25, 0.25, 0.75]
+    },
+    "covariance_anisotropy": {
+      "spectrum": [4.0, 4.0, 1.0, 1.0, 0.25, 0.25, 1.0, 1.0],
+      "cyclic_shift_per_domain": 2
+    }
+  },
+  "vff": {
+    "gamma": 1.5,
+    "xi": 1e-6,
+    "f_min": 0.05,
+    "f_max": 1.0
+  },
+  "bootstrap": {
+    "replicates": 10000,
+    "seed": 2026080799,
+    "interval": [0.025, 0.975]
+  },
+  "decision_thresholds": {
+    "minimum_relative_gain": 0.005,
+    "maximum_single_domain_relative_harm": 0.01,
+    "null_maximum_oracle_opportunity": 0.001,
+    "scale_isolation_absolute_tolerance": 1e-8
+  },
+  "formal_output": "runs_real/tmlr_synthetic_v1"
+}

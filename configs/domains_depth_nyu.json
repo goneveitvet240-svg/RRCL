@@ -1,0 +1,29 @@
+{
+  "_note": "NYU Depth V2 — 3 sequential acquisition batches as proxy domains (no scene metadata in Parquet conversion). D0=source_train, D1=source_validation, D2=source_test.",
+  "domains": [
+    {
+      "name": "NYU-D0",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d0_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d0_test.txt",
+      "max_depth": 10.0
+    },
+    {
+      "name": "NYU-D1",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d1_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d1_test.txt",
+      "max_depth": 10.0
+    },
+    {
+      "name": "NYU-D2",
+      "kind": "nyu",
+      "root": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed",
+      "split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d2_train.txt",
+      "test_split_file": "/root/autodl-tmp/datasets/NYU_Depth_V2/processed/splits/nyu_d2_test.txt",
+      "max_depth": 10.0
+    }
+  ]
+}

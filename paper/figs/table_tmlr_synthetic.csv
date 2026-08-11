@@ -1,0 +1,9 @@
+cell_id,reliability,mapping_change,covariance_anisotropy,fixed_f_oracle_gain_pct,fstar_pred_gain_pct,precision_gain_pct,shrinkage_gamma_gain_pct,vff_rls_gain_pct,opportunity_present
+0000,0,0,0,0.034,0.003,-0.005,0.003,0.000,false
+0001,0,0,1,0.050,0.005,-0.001,0.001,0.000,false
+0010,0,1,0,0.013,-0.011,-0.021,0.006,-0.000,false
+0011,0,1,1,0.019,-0.089,-0.031,0.002,-0.069,false
+0100,1,0,0,0.200,0.185,0.393,0.359,0.000,false
+0101,1,0,1,0.179,0.117,0.341,0.290,-0.000,false
+0110,1,1,0,0.029,-0.943,-14.100,-0.372,-9.166,false
+0111,1,1,1,0.014,-0.001,-4.542,-0.171,-6.704,false

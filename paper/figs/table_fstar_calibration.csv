@@ -1,0 +1,5 @@
+family,n,factor_mae,bias,oracle_mse_gain_pct,selected_mse_gain_pct,mse_regret_pct,selected_rel_gain_pct
+All,40,0.245,-0.2125,2.579,-2.876,5.535,-1.836
+JHU/SHA/SHB,20,0.290,-0.290,4.063,-5.723,9.935,-2.534
+QNRF/SHA/SHB,15,0.113,-0.0267,1.461,0.832,0.641,-0.674
+SHA/SHB,5,0.460,-0.460,0.000,-2.615,2.615,-2.532

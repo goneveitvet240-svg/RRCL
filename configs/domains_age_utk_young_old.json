@@ -1,0 +1,7 @@
+{
+  "_note": "同库量级差异：UTKFace 年轻(均龄~12) -> 年老(均龄~60)。预期归一化后塌回 f=1（量级假象，类比 SHA→SHB）。",
+  "domains": [
+    {"name": "UTK-young", "kind": "utkface", "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UTKFace_dl/UTKFace", "age_min": 1, "age_max": 25},
+    {"name": "UTK-old",   "kind": "utkface", "root": "/root/autodl-tmp/pangwei_rrcl/datasets/UTKFace_dl/UTKFace", "age_min": 45, "age_max": 90}
+  ]
+}

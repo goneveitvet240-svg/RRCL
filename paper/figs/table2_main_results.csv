@@ -1,0 +1,5 @@
+order,f1_rel_mae,oracle_rel_mae,oracle_f,adaptive_rel_mae,adaptive_f_used,improvement
+JHU→SHA→SHB,0.511,0.496,0.6,0.482,"[1,0.05,0.55]",+5.7%
+JHU→SHB→SHA,0.511,0.479,0.4,0.483,"[1,0.25,0.25]",+5.6%
+SHA→SHB,0.365,0.365,1.0,0.365,"[1,1]",±0%
+SHA→SHB→JHU,0.51,0.51,1.0,0.51,"[1,1,1]",±0%

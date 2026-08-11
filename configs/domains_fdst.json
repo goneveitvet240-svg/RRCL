@@ -1,0 +1,70 @@
+{
+  "domains": [
+    {
+      "name": "FDST-scene03-21",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene03",
+      "video_id": "21",
+      "sample_key": "FDST-scene03-21",
+      "fit_include_file": "configs/fdst_splits/d01_fit.txt",
+      "val_include_file": "configs/fdst_splits/d01_val.txt",
+      "test_include_file": "configs/fdst_splits/d01_test.txt"
+    },
+    {
+      "name": "FDST-scene05-31",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene05",
+      "video_id": "31",
+      "sample_key": "FDST-scene05-31",
+      "fit_include_file": "configs/fdst_splits/d02_fit.txt",
+      "val_include_file": "configs/fdst_splits/d02_val.txt",
+      "test_include_file": "configs/fdst_splits/d02_test.txt"
+    },
+    {
+      "name": "FDST-scene01-1",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene01",
+      "video_id": "1",
+      "sample_key": "FDST-scene01-1",
+      "fit_include_file": "configs/fdst_splits/d03_fit.txt",
+      "val_include_file": "configs/fdst_splits/d03_val.txt",
+      "test_include_file": "configs/fdst_splits/d03_test.txt"
+    },
+    {
+      "name": "FDST-scene04-26",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene04",
+      "video_id": "26",
+      "sample_key": "FDST-scene04-26",
+      "fit_include_file": "configs/fdst_splits/d04_fit.txt",
+      "val_include_file": "configs/fdst_splits/d04_val.txt",
+      "test_include_file": "configs/fdst_splits/d04_test.txt"
+    },
+    {
+      "name": "FDST-scene06-36",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene06",
+      "video_id": "36",
+      "sample_key": "FDST-scene06-36",
+      "fit_include_file": "configs/fdst_splits/d05_fit.txt",
+      "val_include_file": "configs/fdst_splits/d05_val.txt",
+      "test_include_file": "configs/fdst_splits/d05_test.txt"
+    },
+    {
+      "name": "FDST-scene02-16",
+      "kind": "fdst_video",
+      "root": "/Users/pangwei/Documents/ai/datasets/FDST",
+      "scene_id": "scene02",
+      "video_id": "16",
+      "sample_key": "FDST-scene02-16",
+      "fit_include_file": "configs/fdst_splits/d06_fit.txt",
+      "val_include_file": "configs/fdst_splits/d06_val.txt",
+      "test_include_file": "configs/fdst_splits/d06_test.txt"
+    }
+  ]
+}

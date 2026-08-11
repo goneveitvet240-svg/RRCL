@@ -1,0 +1,11 @@
+family,seed,gamma_pred,gamma_oracle,oracle_gain_pct,selected_gain_pct,correct
+JHU,42,0.85,1.00,15.190,12.791,true
+JHU,43,0.00,1.00,4.860,0.000,false
+JHU,44,0.20,0.50,1.619,0.972,true
+JHU,45,0.15,1.00,9.863,1.496,true
+JHU,46,0.40,1.00,5.567,2.265,true
+QNRF,42,0.00,0.10,0.003,0.000,true
+QNRF,43,0.00,0.15,0.027,0.000,true
+QNRF,44,0.30,0.05,0.005,-0.221,false
+QNRF,45,1.00,0.45,0.026,-0.105,false
+QNRF,46,0.00,0.10,0.094,0.000,true

@@ -1,0 +1,44 @@
+{
+  "schema": "rrcl-fdst-scene-identity-audit-v1",
+  "protocol": "C7-fdst-v3",
+  "reviewed_at": "2026-08-09",
+  "reviewer": "pangwei_with_codex",
+  "official_repository": "https://github.com/sweetyy83/Lstn_fdst_dataset",
+  "official_repository_commit": "b4c6e418195ec74edb4b4a2d92ab44558e5d5ffd",
+  "official_readme_sha256": "489c07371b430b8392af4f18100c678752ce59914a4b2f5869dce903688c1f66",
+  "official_claim": "100 numbered videos from 13 scenes; 60 train videos and 40 test videos",
+  "paper_source": {
+    "url": "https://export.arxiv.org/e-print/1907.07911",
+    "source_archive_sha256": "a89d5803c38abb2629b2e272f5a830fe6c50dfa6b7c2e70c22150feb487505e1",
+    "main_tex_sha256": "77e4b29fb636ebfc6d8698860d0f8d2ec350cd37279b1f5d3a35086d603ea165",
+    "support": "The dataset section states 100 videos from 13 scenes and the 60-video/40-video train/test partition."
+  },
+  "explicit_official_video_to_scene_table_found": false,
+  "mapping_evidence_level": "project-reviewed directory and visual identity; not an author-published lookup table",
+  "identity_method": "The 13 contiguous numeric video ranges cover 1-100 exactly. All 60 official train directory ids map to exactly one range. A local-only first-frame contact sheet was human-reviewed for fixed-camera/background consistency within ranges and separation across ranges. No annotation count, feature, prediction, or metric was used.",
+  "local_contact_sheet": {
+    "committed": false,
+    "sha256": "6e34d3c62862ffd68e6c1a62256d9af69f1877b5d9af22d0b0b07ccce8212cc3",
+    "layout": "five columns, numeric video order, first train frame only",
+    "reason_not_committed": "raw FDST imagery is local-only and not redistributed"
+  },
+  "scene_ranges": {
+    "scene01": "1-15",
+    "scene02": "16-20",
+    "scene03": "21-25",
+    "scene04": "26-30",
+    "scene05": "31-35",
+    "scene06": "36-40",
+    "scene07": "41-45",
+    "scene08": "46-50",
+    "scene09": "51-60",
+    "scene10": "61-70",
+    "scene11": "71-80",
+    "scene12": "81-90",
+    "scene13": "91-100"
+  },
+  "train_video_count": 60,
+  "train_video_ids_sha256": "8177789a1899d002b54d71393de8972e39cb03ca70ffe472249f8c904dd18f2e",
+  "coverage": "exact",
+  "raw_images_committed": false
+}

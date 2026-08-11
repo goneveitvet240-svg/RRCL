@@ -1,0 +1,11 @@
+{
+  "domains": [
+    {
+      "name": "JHU",
+      "kind": "jhu",
+      "root": "/root/autodl-tmp/pangwei_rrcl/datasets/JHU_CROWD/jhu_crowd_v2.0/jhu_crowd_v2.0",
+      "train_split": "train",
+      "test_split": "val"
+    }
+  ]
+}

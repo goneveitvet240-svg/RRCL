@@ -1,0 +1,15 @@
+{
+  "dataset": "FDST",
+  "full_name": "Fudan-ShanghaiTech Dataset",
+  "official_author_repository": "https://github.com/sweetyy83/Lstn_fdst_dataset",
+  "paper": "Locality-constrained Spatial Transformer Network for Video Crowd Counting",
+  "paper_url": "https://arxiv.org/abs/1907.07911",
+  "retrieved_at": "2026-08-09",
+  "access_evidence": "The dataset authors' public repository provides Baidu and Google Drive download links and requests citation of the dataset paper.",
+  "license_status": "No explicit standalone raw-dataset license was located in the official repository at retrieval time.",
+  "allowed_project_scope": "Local non-commercial academic evaluation only; cite the dataset paper and official repository.",
+  "raw_data_redistribution": false,
+  "protocol_partition_policy": "Use only official train_data for C7-fdst-v3; leave official test_data untouched.",
+  "scene_identity_audit": "docs/FDST_SCENE_IDENTITY_AUDIT.json",
+  "notes": "This record documents provenance and project handling; it is not a legal conclusion or a claim that an explicit license exists. V3 supersedes pre-data V2 before any formal split or model run because the official labels contain finite near-boundary coordinates requiring transparent clipping audit."
+}

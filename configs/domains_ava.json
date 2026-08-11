@@ -1,0 +1,41 @@
+{
+  "_note": "AVA Aesthetics 10% subset — 3 score-tier domains by p33/p67 percentile. Low <5.09, Mid 5.09–5.69, High ≥5.69. Use as scalar-regression task; score tiers are NOT claimed to be natural continual domains (see RRCL_B_TASKS_MANIFEST).",
+  "domains": [
+    {
+      "name": "AVA-Low",
+      "kind": "ava",
+      "root": "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/images",
+      "csv":  "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/aesthetic_scores.csv",
+      "img_col": "image_name",
+      "score_col": "mean_score",
+      "score_min": 0.0,
+      "score_max": 5.09,
+      "train_ratio": 0.8,
+      "split_seed": 42
+    },
+    {
+      "name": "AVA-Mid",
+      "kind": "ava",
+      "root": "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/images",
+      "csv":  "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/aesthetic_scores.csv",
+      "img_col": "image_name",
+      "score_col": "mean_score",
+      "score_min": 5.09,
+      "score_max": 5.69,
+      "train_ratio": 0.8,
+      "split_seed": 42
+    },
+    {
+      "name": "AVA-High",
+      "kind": "ava",
+      "root": "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/images",
+      "csv":  "/root/autodl-tmp/datasets/AVA_Aesthetics_10pct/processed/aesthetic_scores.csv",
+      "img_col": "image_name",
+      "score_col": "mean_score",
+      "score_min": 5.69,
+      "score_max": 10.0,
+      "train_ratio": 0.8,
+      "split_seed": 42
+    }
+  ]
+}

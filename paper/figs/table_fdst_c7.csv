@@ -1,0 +1,6 @@
+rule,balanced_rel_mae,improvement_rel,positive,safe,evidence_role
+f1,0.09446164637323735,0.0,,,joint-equivalent reference
+fixed_f_oracle,0.09446164637323735,0.0,false,,diagnostic test oracle
+fstar_pred,0.09446164637323735,0.0,false,true,train-only frozen rule
+shrinkage_gamma,0.09446164637324049,-3.320268241116173e-14,false,true,train-only frozen rule
+precision_weighting,0.11529641248311258,-0.2205632329078067,false,false,train-only frozen rule
