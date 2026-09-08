@@ -124,6 +124,25 @@ and image size; if dataset paths change across machines, precomputed caches do
 not currently deduplicate automatically, so keep a stable mounted dataset path
 or add a path-independent cache manifest before migration.
 
+## Leakage-safe five-fold baseline restoration v4
+
+V4 replaces the one-split selector with globally shared five-fold
+reference-group cross-validation and restores the full baseline roster before
+the fixed-trajectory and automatic-`f` batches:
+
+```bash
+python3 scripts/run_kadid_group_cv_v4.py --selftest \
+  --out runs_real/kadid_group_cv_v4/selftest
+python3 scripts/validate_kadid_group_cv_v4.py \
+  runs_real/kadid_group_cv_v4/selftest/kadid_group_cv_v4.json
+```
+
+The natural run is frozen to all four methods, including the 2,000-dimensional
+post-mean-pooling Gaussian-ReLU projection. `--skip-projection` is available
+only for code diagnostics; the natural protocol rejects it. The reported
+paired bootstrap is post-selection and empirical, not selection-adjusted
+inferential evidence.
+
 ## Fresh AutoDL instance
 
 Clone below `/root/autodl-tmp`, which is the intended persistent data volume,
@@ -142,6 +161,10 @@ bash scripts/package_kadid_scale_audit_v2.sh
 # Required leakage-corrected replacement
 bash scripts/run_kadid_scale_audit_v3.sh
 bash scripts/package_kadid_scale_audit_v3.sh
+
+# Five-fold restoration required before automatic-f development
+bash scripts/run_kadid_group_cv_v4.sh
+bash scripts/package_kadid_group_cv_v4.sh
 ```
 
 The setup script deliberately keeps the CUDA-enabled PyTorch supplied by the

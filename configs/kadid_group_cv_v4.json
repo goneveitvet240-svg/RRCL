@@ -1,0 +1,80 @@
+{
+  "protocol_id": "rrcl-kadid-group-cv-v4",
+  "status": "development-only",
+  "created_date": "2026-09-09",
+  "purpose": "Restore invalidated KADID baselines under globally shared reference-group cross-validation before constructing a forgetting-factor bank.",
+  "domain_config_basename": "domains_iqa_kadid.json",
+  "forbidden_dataset_tokens": ["fdst"],
+  "expected_domains": [
+    "KADID-Noise",
+    "KADID-Blur",
+    "KADID-Color",
+    "KADID-Compression",
+    "KADID-Spatial"
+  ],
+  "backbone": "vit_base_patch14_dinov2.lvd142m",
+  "image_size": 518,
+  "max_train_per_domain": 500,
+  "sample_seed": 42,
+  "expected_train_reference_groups": 64,
+  "group_cv": {
+    "folds": 5,
+    "seed": 42,
+    "sample_key": "KADID-10k-reference-content",
+    "algorithm": "sha256-rank-round-robin-v1",
+    "selection_metric": "balanced_domain_mean_oof_normalized_mse",
+    "target_scale": "fold_fit_domain_mean",
+    "final_refit_target_scale": "full_development_train_domain_mean"
+  },
+  "lambda_grid": {
+    "kind": "log10",
+    "minimum_exponent": -5.0,
+    "maximum_exponent": 4.0,
+    "points": 37
+  },
+  "reference_normalized_lambda": 1.0,
+  "lambda_tie_break": "larger_lambda",
+  "methods": [
+    "linear_sample_mean_pooled",
+    "linear_domain_balanced",
+    "independent_linear_domain_heads",
+    "image_mean_gaussian_relu_projection_sample_mean_pooled"
+  ],
+  "projection": {
+    "kind": "image_mean_gaussian_relu",
+    "dimension": 2000,
+    "seed": 0,
+    "standardizer": "domain_zero_fold_fit",
+    "qualification": "post-mean-pooling capacity baseline; not patch-level nonlinear aggregation and not full RanPAC"
+  },
+  "bootstrap": {
+    "unit": "pristine_reference_group",
+    "resamples": 10000,
+    "confidence": 0.95,
+    "seed": 4204,
+    "selection_adjustment": "none",
+    "qualification": "post-selection empirical paired bootstrap; not selection-adjusted and not a formal coverage guarantee"
+  },
+  "test_policy": "development-only descriptive evaluation after training-only group-CV selection",
+  "output_root": "runs_real/kadid_group_cv_v4",
+  "result_filename": "kadid_group_cv_v4.json",
+  "invalidated_predecessors": [
+    "rrcl-new-method-kadid-development-v1",
+    "rrcl-new-method-kadid-scale-audit-v2"
+  ],
+  "scope_status": {
+    "fixed_trajectory_bank": "not_measured_in_batch4",
+    "risk_controlled_hard_selection": "not_measured_in_batch4",
+    "analytic_shrinkage": "not_measured_in_batch4",
+    "patch_level_nonlinear_projection": "not_measured_in_batch4",
+    "automatic_f": "not_measured_in_batch4"
+  },
+  "notes": [
+    "One reference id has one fold across all distortion families.",
+    "Every training reference is out-of-fold exactly once.",
+    "All hyperparameters and methods are selected from training-side OOF loss only.",
+    "The repeatedly inspected KADID test split is development evidence, not independent confirmation.",
+    "The image-level projection restores the invalidated v1 capacity baseline but does not implement patch-before-pooling nonlinearity.",
+    "FDST is forbidden."
+  ]
+}

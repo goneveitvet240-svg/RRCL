@@ -96,6 +96,10 @@ bash scripts/setup_autodl.sh
 export RRCL_KADID_ROOT=/root/autodl-tmp/datasets/KADID10k/extracted/kadid10k
 bash scripts/run_kadid_autodl.sh
 bash scripts/package_autodl_results.sh
+
+# Leakage-safe five-fold baseline restoration before automatic-f work
+bash scripts/run_kadid_group_cv_v4.sh
+bash scripts/package_kadid_group_cv_v4.sh
 ```
 
 `RRCL_KADID_ROOT` must contain `images/` and `dmos.csv`. Generated datasets,
