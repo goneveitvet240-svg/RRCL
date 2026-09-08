@@ -1,0 +1,76 @@
+{
+  "protocol_id": "rrcl-new-method-development-v1",
+  "status": "development-only",
+  "created_date": "2026-09-08",
+  "forbidden_dataset_tokens": [
+    "fdst"
+  ],
+  "allowed_domain_config_basenames": [
+    "domains_jhu_sha_shb.json",
+    "domains_jhu_shb_sha.json",
+    "domains_sha_jhu_shb.json",
+    "domains_sha_shb.json",
+    "domains_sha_shb_jhu.json",
+    "domains_qnrf_sha_shb.json",
+    "domains_qnrf_shb_sha.json",
+    "domains_sha_shb_qnrf.json"
+  ],
+  "allowed_sample_keys": [
+    "JHU-v2.0",
+    "ShanghaiTech-A",
+    "ShanghaiTech-B",
+    "UCF-QNRF"
+  ],
+  "allowed_domain_kinds": [
+    "jhu",
+    "shanghai",
+    "shanghaitech",
+    "qnrf",
+    "ucf_qnrf"
+  ],
+  "primary_training_protocol": "aligned_fit_only",
+  "secondary_training_protocol": "full_refit_ablation",
+  "validation_fraction": 0.2,
+  "val_every": 5,
+  "lambda_grid": [
+    0.01,
+    0.1,
+    1.0,
+    10.0,
+    100.0,
+    1000.0,
+    10000.0
+  ],
+  "reference_lambda": 100.0,
+  "lambda_selection_objective": "balanced_domain_mean_unclipped_fused_normalized_mse",
+  "downstream_metric": "balanced_domain_mean_clipped_relative_mae",
+  "lambda_tie_break": "larger_lambda",
+  "methods": [
+    "pooled_f1",
+    "domain_balanced",
+    "domain_balanced_mass_matched",
+    "single_domain",
+    "ranpac_style_image"
+  ],
+  "target_normalization": "fit_partition_domain_mean",
+  "backbone": "vit_base_patch14_dinov2.lvd142m",
+  "image_size": 518,
+  "max_per_domain": 400,
+  "patch_target": "dct5",
+  "alpha_patch": 0.25,
+  "projection": {
+    "kind": "gaussian_relu",
+    "dimension": 2000,
+    "seed": 0,
+    "standardizer": "domain_zero_fit_partition"
+  },
+  "suggested_material_oracle_gain": 0.005,
+  "suggested_simple_baseline_recovery": 0.8,
+  "notes": [
+    "This protocol is for method development and does not create confirmatory evidence.",
+    "FDST is forbidden for tuning, candidate generation, thresholding, or ablation.",
+    "The primary aligned-fit protocol never trains on validation observations.",
+    "The full-refit result is an explicitly labelled deployment ablation and is not covered by the aligned-fit validation risk.",
+    "Suggested decision thresholds are planning defaults, not retrospective pass criteria."
+  ]
+}

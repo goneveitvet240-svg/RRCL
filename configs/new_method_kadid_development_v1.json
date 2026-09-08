@@ -1,0 +1,43 @@
+{
+  "protocol_id": "rrcl-new-method-kadid-development-v1",
+  "status": "development-only",
+  "created_date": "2026-09-08",
+  "domain_config_basename": "domains_iqa_kadid.json",
+  "forbidden_dataset_tokens": ["fdst"],
+  "expected_domains": [
+    "KADID-Noise",
+    "KADID-Blur",
+    "KADID-Color",
+    "KADID-Compression",
+    "KADID-Spatial"
+  ],
+  "backbone": "vit_base_patch14_dinov2.lvd142m",
+  "image_size": 518,
+  "max_train_per_domain": 500,
+  "test_policy": "all_reference-disjoint_test_images",
+  "sample_seed": 42,
+  "selector_split_seed": 42,
+  "selector_val_every": 5,
+  "selector_split_unit": "reference_content_group",
+  "lambda_grid": [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0],
+  "reference_lambda": 100.0,
+  "lambda_selection_objective": "balanced_domain_mean_unclipped_normalized_mse",
+  "downstream_metric": "balanced_domain_mean_clipped_relative_mae",
+  "target_normalization": "fit_partition_domain_mean",
+  "primary_training_protocol": "aligned_fit_only",
+  "secondary_training_protocol": "full_refit_ablation",
+  "lambda_tie_break": "larger_lambda",
+  "projection": {
+    "kind": "gaussian_relu",
+    "dimension": 2000,
+    "seed": 0,
+    "standardizer": "domain_zero_fit_partition"
+  },
+  "output_root": "runs_real/new_method_kadid_development_v1",
+  "notes": [
+    "KADID is reused development data and cannot provide independent confirmation.",
+    "Reference contents remain disjoint across train, selector validation, and test roles.",
+    "FDST is forbidden.",
+    "Full-refit results are not certified by the fit-only validation risk."
+  ]
+}

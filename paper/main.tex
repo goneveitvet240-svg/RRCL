@@ -52,48 +52,30 @@ Analytic Continual Visual Regression}
 % ==============================================================
 \begin{abstract}
 % ==============================================================
-Analytic continual learning can update a recursive least-squares (RLS) head
-over frozen features without replay.  With forgetting factor $f=1$, its
-sufficient statistics exactly recover the matched joint ridge solution, but
-this equivalence does not imply that uniform historical weighting minimizes
-balanced risk across heterogeneous domains. We separate whether a frozen
-scalar-factor family contains a useful weighting from whether an allowed
-train-only rule selects it. Under common-mapping, equal-information,
-equal-noise and zero-ridge-bias
-conditions, $f=1$ minimizes expected risk; an isotropic finite-horizon analysis
-gives a local condition for beneficial forgetting. A scoped two-world example
-also shows that unrestricted train--test covariance shift can make the
-test-optimal factor non-identifiable from complete training information.
+Analytic continual learning updates a recursive least-squares (RLS) head over
+frozen features without raw-example replay.  Although $f=1$ exactly recovers
+the matched joint ridge solution, uniform historical weighting need not
+minimize balanced risk across heterogeneous domains.  We therefore separate
+\emph{opportunity}---whether a frozen scalar-factor family contains a useful
+$f<1$---from \emph{selection} by a train-only rule.  In an isotropic model we
+derive conditions for $f=1$, a two-domain optimum that interprets forgetting as
+information rebalancing, and a scoped non-identifiability example under
+unrestricted train--test covariance shift.
 
-We retain four preregistered or frozen tests. In a $2^4$ controlled study, all
-16 cells remain below the prespecified $0.5\%$ material scalar-grid
-opportunity threshold. On a previously unseen FDST source, the diagnostic
-Oracle again selects $f=1$ within the frozen scalar grid; this is an external
-class-conditional boundary, not confirmation of the development gap. We then
-broaden the synthetic task distribution and
-train a KNN curve selector on 512 simulator tasks, tune it on 128, and evaluate
-once on 256 held-out tasks. Forty test tasks have at least $0.5\%$ scalar-grid
-Oracle opportunity. On this subset the learned selector improves over $f=1$ by
-$0.520\%$ (95\% interval $[0.330\%,0.728\%]$), but its regret is higher than
-the frozen analytic rule's ($0.701\%$ versus $0.429\%$), so the preregistered
-four-part composite success criterion is not met. The learned rule nevertheless
-has positive all-task utility and lower mean-domain harm, whereas the analytic
-rule has lower opportunity-subset regret; neither dominates. Matched SIFt-RLS
-and DOS-ELM-style baselines yield only $0.109\%$ and $0.118\%$ mean utility on
-the same subset. These are 8-dimensional synthetic linear-head comparisons,
-not a fair natural-feature test of directional forgetting.
-
-Finally, two low-resolution crowd-counting development diagnostics retain
-rule failures: a
-reliability proxy fails its JHU/QNRF material-decision gate, while an isotropic
-factor predictor has worse factor MAE than constant $f=1$ and worsens matched
-test MSE by $2.876\%$ despite a $2.579\%$ scalar-grid Oracle opportunity.
-These results bound the studied scalar rules, finite grids and task
-distributions; they neither establish a validated adaptive algorithm nor a
-universal train-only impossibility or absence of directional-weighting
-opportunity.
-Manifests, locks, hashes and independent recomputation cover every retained
-claim set.
+Four frozen tests bound the empirical claim.  A preregistered $2^4$ controlled
+study and a single-shot unseen FDST source show no material opportunity within
+their scalar grids.  A broader held-out simulator contains 40 opportunity
+tasks among 256: a KNN selector improves over $f=1$ by $0.520\%$ on this subset,
+but has higher Oracle regret than the frozen analytic rule ($0.701\%$ versus
+$0.429\%$), so the preregistered composite criterion is not met.  Two
+low-resolution crowd-counting development diagnostics likewise retain missed
+or harmful selections despite positive diagnostic Oracle headroom.  The
+evidence therefore supports neither always using $f=1$ nor a validated
+adaptive selector: useful scalar discounting exists in some conditions, but
+the tested train-only rules do not identify it reliably.  The conclusion is
+restricted to the studied scalar families, grids and task distributions; it
+is not a universal train-only impossibility or a claim about directional
+forgetting.
 \end{abstract}
 
 % ==============================================================
@@ -101,7 +83,6 @@ claim set.
 \label{sec:intro}
 % ==============================================================
 
-\paragraph{Joint equivalence is not cross-domain optimality.}
 Large pretrained vision models such as DINOv2~\citep{oquab2023dinov2} and
 CLIP~\citep{radford2021learning} provide transferable frozen features.  A
 closed-form ridge head can then be updated without backpropagation or raw-
@@ -115,7 +96,6 @@ domains differ in information, noise, label scale or feature-to-target
 mapping, a balanced multi-domain objective need not prefer the same weights
 as pooled empirical risk.
 
-\paragraph{The opportunity--selection question.}
 Visual regression makes this distinction explicit because errors are
 continuous and domain scales can differ substantially.  A test sweep may show
 that down-weighting some historical domains could improve balanced risk, but
@@ -126,7 +106,6 @@ questions: \textbf{when does a predeclared scalar-factor family contain useful
 non-uniform historical weighting, and can a prespecified train-only statistic
 select it with positive decision utility?}
 
-\paragraph{A falsification rather than an algorithm-success study.}
 We answer these questions in task-aware analytic continual visual regression
 with a frozen DINOv2 representation and shared ridge head.  Our development
 protocol retains two negative outcomes: a reliability-reweighting rule fails
@@ -139,42 +118,17 @@ conclusion about richer directional forgetting families.
 
 \paragraph{Our contributions.}
 \begin{enumerate}
-  \item \textbf{Boundary results rather than a representation mechanism.} We make the assumptions
-    behind $f=1$ optimality explicit and derive an exact finite-horizon
-    directional condition for beneficial fixed-factor forgetting under an
-    isotropic model.  We also give a two-world non-identifiability example for
-    unrestricted train--test covariance shift. These are scoped boundary
-    analyses, not a predictive theory of anisotropic DINOv2 features.
-  \item \textbf{An auditable, class-conditional opportunity--selection decomposition.} We define
-    test-swept factors only as diagnostic references within an explicit
-    candidate family and evaluate
-    train-only choices separately by factor error, matched-risk gain, regret
-    and downstream utility.
-  \item \textbf{Two retained development diagnostics.} Across five dependent
-    splits, the reliability proxy fails its frozen JHU/QNRF material-decision
-    gate, while the fixed-factor predictor
-    has moderate oracle association but worse factor MAE and test utility than
-    constant $f=1$. We retain these reproducible case studies without treating
-    them as inferential replications.
-  \item \textbf{A held-out learned-selector stress test and matched baselines.}
-    A separately preregistered simulator study trains on 512 tasks, selects
-    hyperparameters on 128 and evaluates once on 256 disjoint tasks. The
-    learned KNN rule has positive held-out utility but does not beat the frozen
-    analytic rule on opportunity-subset regret, so the composite success
-    criterion is not met. SIFt-RLS and DOS-ELM-style
-    results enter the same synthetic head, data, information and risk protocol,
-    with their unequal update costs reported explicitly; this synthetic test
-    does not resolve directional forgetting on natural DINOv2 features.
-  \item \textbf{A single-shot external boundary.} On six reviewed scenes from
-    one previously unseen FDST source, the frozen fixed-factor Oracle selects
-    $f=1$ and neither train-only rule improves it. This is a
-    no-material-opportunity boundary within the frozen scalar grid, not six
-    independent replications and not evidence that other datasets or weighting
-    families cannot benefit.
-  \item \textbf{Explicit evidence boundaries.} Dependent orders and seeds are
-    not treated as independent datasets.  Label-defined and non-semantic proxy
-    domains do not count as natural-domain replications, and no result is
-    promoted beyond its tracked provenance status.
+  \item \textbf{Theory.} We state exact conditions for $f=1$, derive the
+    two-domain optimum $f^\star=\min\{1,(1+c)/(a+c)\}$, and give a scoped
+    train-only non-identifiability example.  The analysis treats forgetting as
+    information rebalancing rather than a direct drift-magnitude estimator.
+  \item \textbf{Auditable decomposition.} We distinguish Oracle opportunity
+    within an explicit scalar family from causal selection, reporting factor
+    error, matched-risk gain, regret and downstream utility.
+  \item \textbf{Falsification tests.} Controlled synthetic, held-out learned-
+    selector, matched-baseline, FDST and retained development studies delimit
+    when opportunity appears and show that the tested selectors are not
+    reliably deployable.
 \end{enumerate}
 
 % ==============================================================
@@ -182,7 +136,6 @@ conclusion about richer directional forgetting families.
 \label{sec:related}
 % ==============================================================
 
-\paragraph{Analytic continual learning.}
 ACIL~\citep{zhuang2022acil} established that recursive feature
 accumulation with $f=1$ makes class-incremental learning equivalent to
 joint offline training. RanPAC~\citep{mcdonnell2023ranpac} extends this
@@ -196,32 +149,15 @@ classification rather than selecting historical weights for regression.
 They motivate our matched $f=1$ reference, but do not establish that the
 same weighting is optimal for heterogeneous visual regression.
 
-\paragraph{Lifelong crowd counting.}
 FLCB~\citep{flcb2022} introduced a domain-incremental self-distillation
 benchmark for lifelong crowd counting.  It uses end-to-end density
 regression with old-model constraints rather than a frozen representation
-and closed-form head.
-Our setting differs fundamentally: we freeze the backbone and use a
-closed-form analytic head, making our update one pass per domain with no
-backpropagation. This places us in the analytic CL tradition rather than
-the deep distillation tradition.
-
-\paragraph{Continual blind IQA.}
+and closed-form head.  Related continual blind-IQA systems use per-dataset
+heads, pseudo-feature replay, task-specific normalization, gating or parameter
+isolation rather than one shared analytic head
+\citep{zhang2023biqa_cl,liqa2022,chen2024tsn_iqa,ma2023silf}.
 Several works study continual learning for blind image quality assessment
-(BIQA). BIQA-CL~\citep{zhang2023biqa_cl} appends one prediction head per
-dataset, regularizes the heads during sequential backpropagation, and uses an
-adaptive weighted sum at inference. LIQA~\citep{liqa2022} instead generates
-pseudo-features for old distortions and applies split-and-merge distillation;
-its final regressor is a single-head, task-agnostic model. TSN-IQA
-~\citep{chen2024tsn_iqa} freezes convolution filters but learns task-specific
-normalization parameters and prediction heads, then combines their outputs
-with a lightweight K-means gating mechanism. SILF~\citep{ma2023silf} uses
-dynamic parameter isolation, cross-task reuse, and selective pruning under a
-memory budget. These are essential task-specific comparators, not variants of
-one common multi-head design.  Our method differs in using a single shared
-closed-form ridge head without backpropagation or pseudo-feature replay, while
-remaining task-aware because the domain-specific target scale $s_k$ is needed
-at inference.
+without the no-replay, closed-form update studied here.
 
 \paragraph{Adaptive forgetting in RLS and analytic output layers.}
 Variable forgetting factor RLS (VFF-RLS)~\citep{leung1993vff} and
@@ -238,36 +174,13 @@ present selector is reliable.  It is a controlled, domain-balanced
 falsification study of scalar train-only sufficient-statistic selection under
 task-aware domain-incremental regression, with natural-feature claims limited
 to the frozen crowd pipeline.
-Bayesian controlled-forgetting methods provide another adjacent line:
-MESU truncates a variational posterior to a finite memory window
-\citep{bonnet2025bayesian}, while a recent unreviewed BayesForget preprint
-tempers sequential posteriors with a prescribed forgetting schedule
-\citep{vallverdu2026bayesian}.  Both update Bayesian neural networks under
-streaming drift; neither studies a train-only selector for the shared
-closed-form ridge head and balanced external-domain risk considered here.
 SIFt-RLS~\citep{lai2024sift} further shows that scalar exponential
 forgetting can be too coarse by forgetting only in the incoming information
-subspace.  It is an important directional alternative, but a computationally
-matched dense-head comparison remains outside the present evidence set.
-For the selector-v2 synthetic matched-head comparison, we apply the published
-DOS-ELM factor update to the same generated task stream and ridge head.
-Because the original paper does
-not unambiguously define its regression ``accuracy'' signal, our explicitly
-labeled regression adaptation uses negative normalized training RMSE (higher
-is better).  Its weighted-design formulation multiplies old design rows by
-$\lambda$, so the corresponding old sufficient statistics are multiplied by
-$\lambda^2$.  We implement SIFt-RLS directly from its information-matrix
-update and select its single fixed factor using training-only validation.
-When the incoming regressor spans the entire parameter space, SIFt-RLS
-reduces exactly to ordinary exponential forgetting; we record this rank
-diagnostic for every domain.
-A fixed-$f$ oracle is \emph{not} a VFF-RLS method.  We therefore include a
-domain-batched implementation of the robust error/noise-power rule of
-\citet{paleologu2008vff}.  Its original rule is sample-wise;
-our adaptation estimates the same powers on held-out samples from the
-incoming known domain and applies one factor at that boundary.  We report
-this adaptation explicitly rather than presenting it as an exact reproduction
-of the original streaming system-identification protocol.
+subspace.  Our matched synthetic comparison implements SIFt directly and a
+clearly labeled DOS-ELM regression adaptation on the same head and data; update
+counts remain unequal.  A domain-batched adaptation of the sample-wise robust
+VFF rule of \citet{paleologu2008vff} is reported separately and is not treated
+as an exact reproduction.
 
 \paragraph{Continual regression.}
 CLeaR~\citep{he2021clear} provides an adaptive buffered framework for
@@ -290,7 +203,6 @@ respectively, Fisher-state or old-model predictions, but not necessarily
 stored exemplars. Our setting is narrower: frozen visual features, a shared
 closed-form head, known domain boundaries, and no raw-example replay.
 
-\paragraph{Adjacent coefficient selection in model merging.}
 Model merging studies how to combine task-specific checkpoints rather than
 how to discount temporal sufficient statistics, but it provides important
 prior art for information-limited weighting.  \citet{xu2025prodistill}
@@ -304,10 +216,8 @@ Conversely, APGD~\citep{wei2025apgd}, NAN~\citep{si2025nan} and
 ACE-Merging~\citep{xu2026ace} construct training-free or parameter-only
 coefficient/statistical rules, while SVC~\citep{li2026svc} corrects spectral
 over-accumulation without data.  These works rule out any broad claim that
-source-side information is uniformly insufficient or that coefficient choice
-has not been studied.  Our claim is restricted to two prespecified rules and
-their permitted statistics in task-aware analytic continual regression; model
-merging is an adjacent setting, not evidence for the present result.
+source-side information is uniformly insufficient.  Our claim concerns only
+the stated RLS model, scalar family, risk and information permission.
 
 % ==============================================================
 \section{Method}
@@ -558,6 +468,65 @@ Eq.~\eqref{eq:validation_gain} is an empirical decision statistic for the
 actual per-boundary objective; it is not an exact estimator of the derivative
 or of $f^*$.
 
+Propositions~\ref{prop:fstar1}--\ref{prop:fstar_lt1} say when $f=1$ stops being
+optimal but not what the optimum is a function of.  Specializing the same
+isotropic model to two domains makes that dependence explicit.
+
+\begin{corollary}[Two-domain optimum as information rebalancing]
+\label{cor:information_balance}
+Let domain $1$ carry $n_1$ samples with coefficient $w_1$ and domain $2$ carry
+$n_2$ samples with $w_2=w_1+\Delta$. Assume idealized isotropic sufficient
+statistics $R_k=n_kI$, independent cross-statistic noise with covariance
+$n_k\sigma^2I$, weights $(f,1)$ and $\lambda=0$. For $\Delta\ne0$, write
+$a=n_1/n_2>0$ for the information ratio and
+$c=2d\sigma^2/(\norm{\Delta}^2n_2)$ for the noise-to-mismatch ratio. Then the
+balanced population excess risk, averaged over training noise, is
+\begin{equation}
+  L(f)=\frac{\tfrac12\norm{\Delta}^2\big[(1+f^2a^2)+c\,(f^2a+1)\big]}
+             {(fa+1)^2},
+  \label{eq:two_domain_risk}
+\end{equation}
+the unconstrained positive stationary point is $(1+c)/(a+c)$, and the
+constrained minimizer over $0<f\le1$ is
+\begin{equation}
+  f^\star=\min\Big\{1,\ \frac{1+c}{a+c}\Big\}.
+  \label{eq:two_domain_fstar}
+\end{equation}
+\end{corollary}
+\begin{proof}
+With $\lambda=0$ and $D=fn_1+n_2$ the estimator is
+$W(f)=(fn_1w_1+n_2w_2)/D$ plus mean-zero noise, so
+$W-w_1=n_2\Delta/D$ and $W-w_2=-fn_1\Delta/D$, giving squared bias
+$\tfrac12\norm{\Delta}^2(n_2^2+f^2n_1^2)/D^2$ and variance
+$d\sigma^2(f^2n_1+n_2)/D^2$.  Dividing through by $n_2^2$ yields
+Eq.~\eqref{eq:two_domain_risk}.  Differentiating,
+$L'(f)\propto 2a(fa+1)\big[f(a+c)-(1+c)\big]$, whose only positive root is
+$f=(1+c)/(a+c)$. The bracket is negative below it and positive above. If
+$a>1$ the root lies in $(0,1)$; if $a=1$ it equals one; and if $a<1$ it lies
+above one, making the constrained minimizer the boundary $f=1$.
+\end{proof}
+
+Two limits carry the interpretation. For $\Delta=0$, where $c$ is undefined,
+directly minimizing the limiting expected-risk expression gives $f^\star=1$
+for every $a$. As $\norm{\Delta}\to0$ the formula approaches the same limit.
+As $\sigma\to0$ we get $c\to0$ and
+$f^\star=\min\{1,1/a\}$. In the history-heavy case $a\ge1$, this becomes
+$f^\star n_1=n_2$: the optimum \emph{equalizes the effective information} of
+the two domains. When $a<1$, scalar forgetting cannot upweight the
+underrepresented history, so the constrained optimum remains $f=1$. Between
+these limits $f^\star$ interpolates according to $c$.
+
+The optimal factor is therefore not a function of drift magnitude alone. It is
+set by the ratio of accumulated information to mapping mismatch, measured in
+units of noise, and forgetting acts as information rebalancing rather than
+drift tracking.  This restates
+Proposition~\ref{prop:fstar1} constructively: equal information ($a=1$) forces
+$f^\star=1$ regardless of $\Delta$, which is why mapping drift alone cannot
+license discounting in expected risk. Section~\ref{sec:history-dominance}
+compares this expected-risk formula with a distinct finite-sample conditional
+Oracle; the latter may select on realization-specific noise and is not an
+exact verification target.
+
 \begin{proposition}[Scoped train-only non-identifiability]
 \label{prop:train_only_nonidentifiability}
 Let $\mathcal I_{\rm tr}$ contain the complete training samples, deterministic
@@ -600,7 +569,6 @@ model, loss, two-domain sequence and information permission used here.
 
 \subsection{Datasets and Evaluation}
 
-\paragraph{Crowd counting.}
 We use ShanghaiTech Part A (SHA; 300/182 train/test, mean count 541) and
 Part B (SHB; 400/316, mean count 123)~\citep{zhang2016shanghaitech},
 JHU-Crowd++ (JHU; 2272/500 train/val, mean count 372)
@@ -612,44 +580,17 @@ the sequence (\emph{balanced multi-domain average}).
 We also report each dataset's raw-count MAE and RMSE, plus nBwT
 (negative backward transfer; higher = less forgetting of old domains).
 
-\paragraph{Single-shot FDST scalar-grid boundary.}
 FDST contains 15,000 annotated video frames from 13 scenes
 ~\citep{fang2019lstn}.  To preserve an untouched evaluation source, protocol
-C7-fdst-v3 uses only the official \texttt{train\_data} partition and leaves the
-official \texttt{test\_data} partition unused.  Before any model access, all
-60 official-train video identities were reviewed against a local contact
-sheet.  Six distinct scenes were then selected by a path-only rule, one video
-per scene, and each 150-frame video was split into contiguous 10-frame blocks:
-90 fit, 30 validation and 30 test frames.  The full 9,000-frame annotation
-audit records 327 clipped near-boundary points in 319 frames and zero points
-beyond the frozen one-percent per-axis tolerance.  The six scenes constitute
-one external data source, not six independent replications.
-
-\paragraph{Backbone and head.}
-The reported development diagnostics use a frozen DINOv2 ViT-B/14 backbone.
-Each image yields $d=768$-dimensional patch tokens; the patch head preserves
-the $37{\times}37$ grid and the image head mean-pools the same tokens.
-Ridge regularization $\lambda=100$.
-For crowd counting we use the dual-head prediction described in
-Section~\ref{sec:method}.
-
-\paragraph{Evidence roles and provenance.}
-SHA, SHB, JHU and QNRF have all participated in method development and are
-therefore development data, not independent confirmations.  QNRF is the
-prespecified negative control in the C4 material-decision diagnostic.  The
-current result set consists of the preregistered controlled synthetic study,
-the held-out selector-v2 stress test, the single-shot FDST boundary, and the
-C4 and fixed-factor development
-tables below; earlier normalization,
-age, aesthetics, depth and image-quality runs do not enter the claim set
-because they used invalid proxy domains, incomplete grouping or unmatched
-provenance.  The release validators check manifest
-identity, $f=1$ order invariance, complete evaluation matrices and clean-commit
-provenance.  The tracked tables agree with prior independent recomputation,
-and their raw artifact packages have been restored locally and reproduced
-byte-for-byte.  Because the local result directory is intentionally ignored by
-Git, the submission supplement is packaged separately with its own manifest
-and hashes.
+C7-fdst-v3 uses only official \texttt{train\_data}: six path-selected scenes,
+one 150-frame video each, split by contiguous blocks into 90/30/30 fit,
+validation and test frames.  The official test partition remains untouched;
+the six scenes are one external source, not six replications.  Natural-data
+runs use the frozen DINOv2 ViT-B/14 dual head of Section~\ref{sec:method}
+with $\lambda=100$.  SHA, SHB, JHU and QNRF are development data; only FDST
+is previously unseen.  Frozen claim sets are checked by manifests, locks,
+complete-matrix validators and independent recomputation, with full audit
+records supplied separately.
 
 \subsection{Controlled Synthetic Boundary Study}
 
@@ -706,6 +647,61 @@ the material gate.  When reliability and mapping change coexist, precision
 and VFF weighting can be strongly harmful, showing that a noise estimate is
 not an interchangeable cross-mapping risk weight.  We retain these zero and
 harmful results without changing amplitudes, grids or seeds.
+
+\subsection{History Dominance and the Information-Balance Prediction}
+\label{sec:history-dominance}
+
+Corollary~\ref{cor:information_balance} predicts that the optimum is governed
+jointly by the information ratio $a=n_1/n_2$ and the noise-to-mismatch ratio
+$c$, not by drift magnitude alone. We compare it with a finite-sample
+conditional Oracle in the same two-domain geometry, sweeping
+$a\in\{1,\dots,1000\}$ and
+$\norm{\Delta}\in\{0,\dots,1.6\}$ with $d=8$, $n_2=64$, $\sigma=0.5$,
+$\lambda=0$, 20 seeds per cell and a $0.005$-spaced factor grid. This study is
+exploratory rather than preregistered. For each random training realization,
+the reported Oracle factor minimizes true population risk and is selected
+before aggregation across seeds. It therefore measures conditional opportunity,
+not attainability, and is not the same estimand as the expected-risk optimum in
+Corollary~\ref{cor:information_balance}.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=.82\linewidth]{history_dominance_phase.pdf}
+  \caption{Conditional finite-sample Oracle (left) and expected-risk closed
+  form (right). Hatching marks Oracle opportunity below $0.5\%$.  Flat-risk
+  cells need not have matching argmins.}
+  \label{fig:history_dominance}
+\end{figure}
+
+\FloatBarrier
+
+The estimands are associated ($r=0.943$, mean absolute deviation $0.058$)
+but not identical.  At $\norm{\Delta}=1.6$ the Oracle is within $0.009$ of
+$1/a$ on average.  At zero mismatch the expected-risk optimum remains one,
+whereas nearly flat realization-specific risk curves let the conditional
+Oracle argmin wander over $[0.390,1.000]$ and exceed the nominal opportunity
+gate in $5/10$ cells (maximum $1.57\%$).  This is selection on estimation
+noise, not structural mismatch.  The result is exploratory and inherits the
+two-domain, isotropic, $\lambda=0$ assumptions; it locates opportunity but does
+not make $\norm{\Delta}$ and $\sigma$ identifiable to a train-only selector.
+
+\subsection{Exploratory Candidate-Family Attribution}
+\label{sec:candidate-family}
+
+The scalar family couples all historical weights to one exponent, enforces
+monotonicity, and keeps the incoming domain maximal.  An exploratory diagnostic
+therefore compares four strictly nested, mean-normalized Oracle families on
+the same generator: scalar, monotone, free with current-domain maximum, and
+fully free, containing 21, 1{,}790, 9{,}280 and 177{,}059 candidates.  Their
+mean gains are respectively $.067\%$, $.085\%$, $.106\%$ and $.224\%$.  Thus
+full relaxation multiplies mean opportunity by $3.3$, yet
+the largest cell reaches only $0.408\%$ and $0/16$ cells clear the material
+gate.  Within this nested path, $75.4\%$ of the scalar-to-free increment occurs
+when the current-domain-maximum constraint is removed.  The free family is
+also exactly order-invariant in this generator, whereas the scalar family's
+forward--reverse opportunity gap averages $.113$ points.  These are
+population-risk Oracle measurements, not an attainable selector or evidence
+about natural DINOv2 features.
 
 \subsection{Held-Out Learned-Selector and Matched-Baseline Study}
 \label{sec:selector-v2-results}
@@ -825,169 +821,29 @@ directional or matrix-valued family.
 \FloatBarrier
 \subsection{Development Diagnostics: Opportunity--Selection Gap}
 
-\paragraph{C4 material-decision derived table.}
-Table~\ref{tab:c4_material} matches the tracked derived CSV for the five-split
-development diagnostic.  The original JSON artifacts and summary package are
-restored in the local audit directory; all 20 records come from clean commit
-\texttt{bb2e3af}, and independent summarization reproduces the tracked JSON
-byte-for-byte.  The test-optimal $\gamma$ and its gain are diagnostic only:
-they are not consumed by the train-only fused proxy.  An oracle gain below
-the prespecified $0.5\%$ threshold is classified as no material reweighting;
-the two orderings of each dataset family are identical-manifest consistency
-checks and contribute only one vote per seed.
+The five-split C4 reliability diagnostic provides positive JHU headroom
+(mean Oracle gain $7.42\%$), but the train-selected gain averages $3.50\%$
+and the frozen $4/5$ decision gate fails jointly with QNRF.  QNRF has only
+$0.031\%$ mean Oracle opportunity, yet the proxy reweights on two splits.
+These dependent splits are a reproducible case study, not independent
+replications or evidence for a reliability mechanism.
 
-These five dependent splits have low decision resolution: one split reversal
-changes a $4/5$ gate outcome. We therefore report no i.i.d. confidence interval
-and use C4 only as a frozen, reproducible development case study, not as
-population-level evidence that the proxy usually fails.
+Across 40 correlated crowd configurations, the isotropic fixed-factor
+predictor has moderate Oracle association (Spearman $0.498$) but worse factor
+MAE than constant $f=1$ ($0.245$ versus $0.225$).  Its selected factor worsens
+matched test MSE by $2.876\%$ despite $2.579\%$ diagnostic Oracle opportunity;
+downstream relative-MAE utility is also negative ($-1.836\%$).  The clearest
+order failure, SHA$\to$JHU$\to$SHB, loses $28.413\%$ matched MSE, while
+SHA$\to$SHB has zero Oracle opportunity yet reweights in all five splits.
+Thus correlation and decision accuracy do not control factor strength or
+regret.  Complete per-seed tables and artifacts remain in the audited
+supplement.
 
-\begin{table*}[h]
-  \centering
-  \caption{C4 development diagnostic derived table, with reported source commit
-  \texttt{bb2e3af}. ``Oracle gain'' is the test improvement of the best
-  $\gamma$ over $\gamma=0$; ``selected gain'' evaluates the train-selected
-  $\gamma$ on test and is diagnostic only. JHU passes $4/5$, QNRF passes
-  $3/5$; because both required at least $4/5$, the overall C4 gate
-  \textbf{fails}.}
-  \label{tab:c4_material}
-  \setlength{\tabcolsep}{5pt}\small
-  \begin{tabular}{lrrrrrr}
-    \toprule
-    Family & Seed & $\gamma_{\rm pred}$ & $\gamma_{\rm oracle}$ &
-    Oracle gain & Selected gain & Correct decision \\
-    \midrule
-    JHU  & 42 & .85 & 1.00 & 15.190\% & 12.791\% & yes \\
-    JHU  & 43 & .00 & 1.00 &  4.860\% &  0.000\% & no (miss) \\
-    JHU  & 44 & .20 &  .50 &  1.619\% &  0.972\% & yes \\
-    JHU  & 45 & .15 & 1.00 &  9.863\% &  1.496\% & yes \\
-    JHU  & 46 & .40 & 1.00 &  5.567\% &  2.265\% & yes \\
-    \midrule
-    QNRF & 42 & .00 &  .10 &  0.003\% &  0.000\% & yes \\
-    QNRF & 43 & .00 &  .15 &  0.027\% &  0.000\% & yes \\
-    QNRF & 44 & .30 &  .05 &  0.005\% & $-0.221$\% & no (false positive) \\
-    QNRF & 45 & 1.00 &  .45 &  0.026\% & $-0.105$\% & no (false positive) \\
-    QNRF & 46 & .00 &  .10 &  0.094\% &  0.000\% & yes \\
-    \bottomrule
-  \end{tabular}
-\end{table*}
-
-\FloatBarrier
-
-The JHU oracle gain averages $7.42\%$, showing repeated headroom within the
-frozen $\gamma$ family across five development splits without identifying its
-causal mechanism.
-However, the train-selected gain
-averages only $3.50\%$ and its descriptive five-split interval crosses zero.
-QNRF has essentially no oracle headroom within that family (mean $0.031\%$), yet the proxy
-reweights on two splits.  Thus these development splits show an
-opportunity--selection gap, but do not establish a reliability-reweighting
-mechanism nor validate the current proxy as a decision rule.
-
-\paragraph{Fixed-factor theory calibration derived table.}
-The tracked derived table compares the isotropic approximation's
-train-only grid minimizer $f^*_{\rm pred}$ with a test-swept
-$f^*_{\rm oracle}$.  The primary oracle minimizes unclipped, domain-balanced
-normalized MSE, matching the squared-risk target of $J(f)$; a clipped
-relative-MAE oracle is reported separately as a downstream task metric.
-Both sides use the same predeclared grid
-$\{0.05,0.10,\ldots,1.00\}$ and a stable hash holdout.  The reported
-development run at source commit \texttt{609399a} contains five seeds and
-eight crowd-counting orderings/configurations (40 correlated scenarios).
-Table~\ref{tab:fstar_calibration} and Figure~\ref{fig:fstar_calibration}
-report that the predictor retains moderate association with the oracle
-(Pearson $0.510$, Spearman $0.498$), but is not calibrated for decisions.
-Its factor MAE/RMSE are $0.245/0.346$, with only $30.0\%$ exact and $32.5\%$
-one-grid-step agreement.  More importantly, constant $f=1$ has lower factor
-MAE ($0.225$), while deploying $f^*_{\rm pred}$ worsens matched test MSE by
-$2.876\%$ on average.  The matched-loss oracle improves by $2.579\%$, leaving
-$5.535\%$ average regret.  The downstream relative-MAE result is also harmful
-($-1.836\%$ selected gain and $4.454\%$ regret).  The derived CSV and figure
-were independently regenerated from 40 restored clean-commit JSON artifacts;
-the regenerated summary and points CSV are byte-identical to the tracked
-audit copies.
-
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=\linewidth]{fstar_calibration_scatter.pdf}
-  \caption{Train-only factor prediction against the matched-MSE test oracle.
-  Marker area denotes multiplicity.  The moderate rank association does not
-  imply decision utility: predictions are biased toward smaller factors and
-  underperform constant $f=1$ in factor MAE and test risk.  All points are
-  development diagnostics, not independent datasets.}
-  \label{fig:fstar_calibration}
-\end{figure}
-
-\begin{table*}[h]
-  \centering
-  \caption{Fixed-factor calibration by dataset family. Gains are relative to
-  $f=1$; positive is better. Regret compares the selected factor with the
-  matched-MSE oracle. ``Rel gain'' evaluates the same selected factor using
-  downstream clipped relative MAE.}
-  \label{tab:fstar_calibration}
-  \setlength{\tabcolsep}{5pt}\small
-  \begin{tabular}{lrrrrrrr}
-    \toprule
-    Family & $n$ & Factor MAE & Bias &
-    Oracle gain & Selected gain & Regret & Rel gain \\
-    \midrule
-    All & 40 & .245 & $-.213$ & $+2.579\%$ & $-2.876\%$ & $5.535\%$ & $-1.836\%$ \\
-    JHU/SHA/SHB & 20 & .290 & $-.290$ & $+4.063\%$ & $-5.723\%$ & $9.935\%$ & $-2.534\%$ \\
-    QNRF/SHA/SHB & 15 & .113 & $-.027$ & $+1.461\%$ & $+0.832\%$ & $.641\%$ & $-.674\%$ \\
-    SHA/SHB & 5 & .460 & $-.460$ & $.000\%$ & $-2.615\%$ & $2.615\%$ & $-2.532\%$ \\
-    \bottomrule
-  \end{tabular}
-\end{table*}
-
-\FloatBarrier
-
-The aggregate hides a decisive order failure.  On
-SHA$\to$JHU$\to$SHB, all five predictions are harmful: the factor is biased
-downward by $0.64$, matched MSE changes by $-28.413\%$, and downstream
-relative MAE by $-28.064\%$.  In contrast, SHA$\to$SHB$\to$JHU is exactly
-predicted as $f=1$ in all five splits.  SHA$\to$SHB is a five-of-five false
-positive, with zero oracle opportunity and $-2.615\%$ selected MSE gain.
-For QNRF-first orders the matched MSE proxy gives a small positive selected
-gain, while downstream relative MAE is negative, exposing an additional
-metric-alignment gap.  Material-decision accuracy ($77.5\%$) therefore cannot
-rescue the factor rule: it does not control discount strength or downstream
-regret.
-
-Because orderings and seeds reuse datasets, these are descriptive calibration
-scenarios rather than 40 independent samples; no iid confidence interval is
-reported.  The tracked derived table fails the frozen deployment criterion
-for this isotropic predictor.  It does not prove that every possible train-only estimator is
-impossible.
-
-\paragraph{What the protocol records.}
-The implemented score is $G_k$ in Eq.~\eqref{eq:validation_gain}: the
-relative reduction of a balanced held-out quadratic objective. Each result
-artifact schema stores $G_k$, $\hat J_k(1)$, the selected objective, and the complete
-factor choice at every boundary. This is designed to make the selector's
-decision auditable without test labels when the original artifacts are
-available. We deliberately do not rename $G_k$ a ``concept-drift
-magnitude,'' because label noise, unequal information, ridge bias, and
-representation error can also change it.
-
-\paragraph{Scope of the propositions.}
-Propositions~\ref{prop:fstar1}--\ref{prop:fstar_lt1} analyze a common fixed
-factor under an isotropic finite-horizon model. The deployed algorithm chooses
-a causal sequence $(f_2,\ldots,f_T)$, under which domain $j$ receives weight
-$\prod_{\ell=j+1}^{T}f_\ell$. The propositions explain why $f=1$ needs
-stronger conditions than ``no mapping drift'' and provide a local directional
-diagnostic, but they are not a regret or optimality guarantee for the greedy
-selector. The fixed-factor derived table above indicates that the isotropic
-prediction is not calibrated well enough for numerical selection claims; its
-original artifact package has been restored and independently recomputed.
-
-\paragraph{Why a local pair score is insufficient.}
-The candidate model at boundary $k$ depends on the entire accumulated
-sufficient-statistic state, so two identical adjacent-domain pairs can imply
-different optimal discounts when their earlier histories differ. This
-structural observation motivates evaluating candidate factors against the
-balanced history rather than mapping a pairwise feature distance directly to
-$f_k$.  An earlier numerical pairwise study lacked the same data-identity and
-provenance checks and is therefore excluded from the present claim set rather
-than retained as evidence.
+The common-$f$ theory is not an optimality guarantee for the deployed causal
+sequence $(f_2,\ldots,f_T)$: its accumulated state depends on the full history,
+so an adjacent-domain score alone is insufficient.  The failed calibration
+does not prove that every train-only estimator is impossible; it bounds the
+two frozen natural-data rules.
 
 \FloatBarrier
 % ==============================================================
@@ -995,183 +851,89 @@ than retained as evidence.
 \label{sec:limitations}
 % ==============================================================
 
-\paragraph{Isotropic approximation.}
-Propositions~1--2 rely on $\Sigma_k = s_k I$; real DINOv2 features are
-non-isotropic, and the common-$f$ analysis does not guarantee the causal
-per-boundary selector.  The tracked calibration-derived table indicates that
-this is a material rather than cosmetic limitation: its selected factor is
-worse than constant $f=1$ in both factor MAE and average test risk.  An anisotropic
-analysis and a selector stability or regret bound remain open. Accordingly,
-the propositions support boundary statements about sufficient conditions and
-effective sample size, not a mechanism claim or calibrated prediction for
-DINOv2.
+The theory assumes isotropic features and a common fixed factor; real DINOv2
+features are anisotropic and the deployed learner chooses a causal factor
+sequence.  Its propositions are therefore boundary statements, not calibrated
+predictions for the natural pipeline.  The non-identifiability example is also
+narrow: it allows unrestricted train--test covariance shift and does not cover
+i.i.d. deployment, structural shift assumptions, randomized rules or a
+disjoint target-calibration set.
 
-\paragraph{Controlled-model scope.}
-Synthetic-v1 uses balanced domain risk, an exactly specified linear
-generator and i.i.d. train/test samples.  Its 16-cell null result establishes
-that the preregistered factor switches are not sufficient for a material
-opportunity within the frozen scalar grid in that model; it does not show that other
-amplitudes, asymmetric deployment mixtures, structured shifts or nonlinear
-representations cannot create one.  Conversely, the harmful
-reliability--mapping interactions are controlled counterexamples, not a claim
-that precision weighting is universally harmful.
+Every opportunity claim is conditional on a frozen scalar grid.  A null result
+does not exclude per-domain, directional, spectral or matrix-valued weighting.
+The exploratory free-weight result bounds this family gap only for one
+generator; it remains an unattainable population-risk Oracle and does not
+generalize to natural features.  Conversely, selector-v2's positive synthetic
+KNN utility does not establish natural-image generalization or contradict the
+unrestricted non-identifiability example.
 
-Selector-v2 deliberately broadens the simulator and supplies a cross-task
-prior through Oracle-labeled meta-training curves. Its positive held-out KNN
-utility therefore does not contradict the unrestricted non-identifiability
-example, and its unmet composite criterion does not prove that richer learned
-selectors cannot succeed. The 40-task opportunity subset is defined by a
-diagnostic Oracle and is reported only because the subset rule was frozen
-before meta-test. Neither synthetic protocol establishes natural-image
-generalization.
+Natural-data evidence is limited.  SHA, SHB, JHU and QNRF are low-resolution
+development cases with dependent splits and reused orders.  FDST is one unseen
+source, not six independent replications, and has no scalar-grid opportunity.
+The fixed DCT-5 smoothing, dual-head mixture and $\lambda=100$ lack a
+preregistered sensitivity analysis.  SIFt and DOS share the synthetic head and
+risk but not update cost, and neither comparison covers the dense natural
+head or deep distillation budgets.
 
-\paragraph{Candidate-family scope.}
-Equation~\ref{eq:class_opportunity} measures improvement only over the frozen
-scalar grid. A zero value therefore cannot establish that per-domain,
-directional, spectral or matrix-valued weighting lacks opportunity. Even a
-positive value is a lower bound on the best improvement available to a larger
-family, not an upper bound on historical reweighting in general.
-
-\paragraph{Scope of the non-identifiability example.}
-Proposition~\ref{prop:train_only_nonidentifiability} allows unrestricted
-domain-specific train--test covariance shift.  Its two worlds show only that
-the missing test-risk weights cannot be recovered from identical training
-information without an additional link between distributions.  The example
-does not cover an i.i.d. train--test setting, structured shift assumptions,
-randomized rules with weaker guarantees, or methods that use a disjoint target
-calibration set.
-
-\paragraph{Natural domains and replication.}
-AVA score tiers and UTK age bands are label-defined; NYU source batches are
-proxy domains and cannot establish natural-domain generalization.  FDST adds
-one previously unseen, non-label-defined source under a frozen single-shot
-protocol, but its scalar-grid Oracle opportunity is absent. It therefore
-provides a natural-data class-conditional boundary rather than a replication
-of the development-set opportunity--selection gap. Six selected scenes do not become six independent
-replications, and the result does not establish behavior on other video,
-backbone or deployment distributions.
-
-\paragraph{Linear head capacity and directional forgetting.}
-Our experiments use scalar exponential forgetting in a linear ridge head.
-Random-feature expansion changes both capacity and storage and does not
-replace a matched directional-forgetting comparison. Selector-v2 now includes
-clean SIFt-RLS and DOS-ELM-style results with the same synthetic linear head,
-data, information and risk, but SIFt performs many more updates. These results
-do not constitute a FLOP-matched comparison and do not test the full
-dual-head crowd model. A natural-data, computationally matched treatment of
-the dense patch head remains necessary. We therefore do not infer that
-directional forgetting fails from the scalar-rule results.
-
-\paragraph{Frozen pipeline hyperparameters.}
-The natural-data pipeline fixes DCT-5 target smoothing, dual-head mixture
-$0.25/0.75$ and ridge $\lambda=100$. We do not report a preregistered
-sensitivity analysis over these choices. The crowd and FDST results are thus
-conditional on this pipeline; changing these values after observing the
-single-shot result would be exploratory rather than independent confirmation.
-
-\paragraph{Development-set resolution.}
-C4 uses five dependent development splits and a $4/5$ decision gate. A single
-split reversal changes the gate, and the 40 fixed-factor scenarios also reuse
-datasets and orders. We retain these cases for reproducible failure diagnosis,
-do not attach i.i.d. confidence intervals, and do not treat them as a
-population-frequency estimate. The disjoint 256-task selector-v2 test supplies
-stronger synthetic uncertainty quantification but no natural-data replication.
-
-\paragraph{Deep distillation baselines.}
-We do not fully implement FLCB's deep distillation variant, which
-operates in a different computational budget (end-to-end training,
-old-model constraints). Comparison is therefore at the ``closed-form
-analytic CL'' level, not against deep lifelong methods.
-
-\paragraph{Metric alignment and uncertainty.}
-The selector optimizes normalized MSE, whereas some headline summaries use
-relative MAE.  The fixed-factor calibration finds configurations where the
-matched-MSE and relative-MAE effects have opposite signs; overall, the
-selected factor is harmful under both metrics. Final evaluation must continue
-to report both metrics, fixed manifests/seeds and paired uncertainty. Small
-gains without these checks are not treated as reliable.
+Finally, normalized MSE and downstream relative MAE can disagree.  We report
+both, retain paired uncertainty and avoid interpreting small or
+selection-adjusted gains as reliable without the frozen gates.
 
 % ==============================================================
 \section{Reproducibility and Data Statement}
 \label{sec:reproducibility}
 % ==============================================================
 
-The anonymous supplement provides the frozen protocols, split metadata,
-derived result tables, validation programs and manifest-bearing component
-archives used for the reported claims. Selector-v2 additionally provides its
-pre-test selection lock, disjoint meta-split records and full held-out task
-records. Each archive records file hashes, and
-the top-level bundle has a separate SHA-256 checksum. Diagnostic Oracles use
-held-out labels only to measure whether opportunity exists within their stated
-candidate families; they are not
-deployable selectors. The FDST raw videos, images and annotations are not
-redistributed. The supplement contains only derived FDST results and the
-metadata and code needed to audit the frozen evaluation; access to the source
-data remains governed by the dataset authors and the original dataset terms.
+The anonymous supplement contains frozen protocols, split metadata, complete
+derived tables, validators, pre-test locks, disjoint meta-splits and
+manifest-bearing archives with hashes.  Diagnostic Oracles use held-out labels
+only to measure candidate-family opportunity and are not deployable.  FDST raw
+data are not redistributed; access remains governed by the original terms.
 
 % ==============================================================
 \section{Broader Impact}
 \label{sec:broader-impact}
 % ==============================================================
 
-Continual visual regression can support applications such as resource
-planning and safety analysis, but crowd-counting systems can also be used in
-surveillance settings with privacy, consent and governance risks. This work
-does not deploy identity tracking or a monitoring system; it studies frozen
-representations, aggregate labels and the reliability of a train-only
-selection mechanism. Any downstream deployment should respect dataset and
-image licensing, assess consent and proportionality, protect personal data,
-and separately test distribution shift and subgroup harms. The negative and
-null results reported here should not be read as evidence that a deployed
-system is safe or reliable.
+Crowd-counting systems carry surveillance, privacy, consent and governance
+risks.  This work studies aggregate labels rather than identity tracking, but
+deployment still requires licensing, proportionality, data protection and
+separate distribution-shift and subgroup-harm tests.  Null results here do not
+imply that a deployed system is safe.
 
 % ==============================================================
 \section{Conclusion}
 \label{sec:conclusion}
 % ==============================================================
 
-This work asks a narrower question than prior drafts: in task-aware
-domain-incremental visual regression with frozen foundation features and a
-shared ridge head, can train-only balanced sufficient statistics select a
-useful factor from a frozen scalar-forgetting family? For the two rules
-represented in the natural-data development tables, neither meets its frozen
-decision criterion. These low-resolution cases are development diagnostics:
-the C4 selector misses or falsely triggers under its material-decision gate,
-and the isotropic fixed-factor predictor has worse
-factor MAE than constant $f=1$ and negative average test utility.  At the same
-time, the matched-loss oracle retains positive opportunity within the fixed
-scalar grid, separating class-conditional headroom from the ability to select
-it causally. The preregistered controlled study adds a complementary boundary:
-under its balanced i.i.d. linear generator, none of 16 cells produces a
-material scalar-grid opportunity, even though scale-isolation and
-reliability-direction checks pass.  The natural-data claims remain development
-findings where an opportunity is claimed.
+We asked whether $f=1$ should always be used in analytic continual visual
+regression and, if not, whether train-only sufficient statistics can reliably
+select a better scalar factor.  The answer is conditional on the candidate
+family.  The controlled study and unseen FDST source show no material
+scalar-grid opportunity, while held-out synthetic tasks and crowd development
+cases contain positive diagnostic headroom.  Thus $f=1$ is not universally
+optimal, but opportunity is sparse and distribution dependent.
 
-A separate preregistered simulator study directly tests whether richer rule
-design changes that conclusion. Its learned KNN selector improves over $f=1$
-on held-out tasks and passes three of four gates, but it does not beat the
-frozen analytic rule on opportunity-subset regret. The preregistered composite
-success criterion is therefore not met, but the positive KNN utility remains
-evidence of a different utility--regret trade-off; neither selector dominates.
-Matched SIFt-RLS is neutral overall and DOS-ELM-style is harmful in the limited
-8-dimensional synthetic comparison, which does not settle natural-feature
-directional forgetting. The single-shot FDST boundary instead finds no
-material opportunity within its fixed scalar grid: its Oracle selects $f=1$,
-neither frozen train-only rule improves it, and precision weighting is harmful.
-Complete
-local provenance chains were independently checked, and publication-safe
-artifacts are packaged with manifests and hashes.
+Selection is the harder problem.  Both frozen natural-data rules miss or make
+harmful decisions.  The held-out KNN rule has positive utility and lower harm,
+but higher opportunity-subset regret than the analytic rule, so the composite
+criterion is not met and neither selector dominates.  These results do not
+validate an adaptive algorithm.
 
-The contribution is therefore a boundary-analysis and falsification protocol
-with derived development findings and a held-out synthetic stress test, not a
-validated adaptive algorithm or an algorithmic-superiority claim.
-Adaptive-forgetting OS-ELM and directional RLS
-are clear prior art.  The theory covers a simplified common-factor model, and
-its non-identifiability example depends on unrestricted covariance shift.
-The unseen FDST result shows that the development scalar-grid gap does not
-automatically generalize under the same frozen pipeline. Other independent
-data may test different candidate families and hyperparameters, but
-FDST must not be reused to tune another selector after this single-shot result.
+The theory explains one boundary: in the two-domain isotropic model,
+$f^\star=\min\{1,(1+c)/(a+c)\}$ depends jointly on information imbalance and
+the noise-to-mismatch ratio.  No mismatch gives $f^\star=1$; dominant
+mismatch in a history-heavy stream gives $f^\star n_1=n_2$.  Forgetting
+therefore rebalances information rather than directly tracking drift.  A
+finite-sample Oracle can still select on nearly flat, realization-specific
+noise, and unrestricted train--test covariance shift prevents any deterministic
+train-only rule from always identifying the test optimum.
+
+The contribution is consequently a scoped boundary analysis and falsification
+protocol, not an algorithmic-superiority or universal-impossibility claim.
+Directional families, independent natural sources and stronger structural or
+calibration assumptions remain open directions; FDST must not be reused to
+tune a new selector after this single-shot evaluation.
 
 % ==============================================================
 \bibliographystyle{tmlr}

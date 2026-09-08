@@ -1,13 +1,52 @@
 import csv
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from datasets_iqa import IQASpec, _load_csv_pairs, _train_test_split
+from datasets_iqa import (
+    IQADomains,
+    IQASpec,
+    _load_csv_pairs,
+    _train_test_split,
+    build_iqa_config,
+)
 from run_iqa_cl import grouped_validation_mask
 
 
 class KADIDSplitTest(unittest.TestCase):
+    def test_config_paths_expand_environment_variables(self):
+        with mock.patch.dict(os.environ, {"RRCL_DATA_ROOT": "/tmp/rrcl-data"}):
+            specs = build_iqa_config(
+                {
+                    "domains": [
+                        {
+                            "name": "portable",
+                            "kind": "csv",
+                            "root": "${RRCL_DATA_ROOT}/images",
+                            "csv": "${RRCL_DATA_ROOT}/scores.csv",
+                        }
+                    ]
+                }
+            )
+        self.assertEqual(specs[0].root, "/tmp/rrcl-data/images")
+        self.assertEqual(specs[0].csv, "/tmp/rrcl-data/scores.csv")
+
+    def test_feature_cache_can_live_under_persistent_root(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch(
+            "datasets_iqa.DinoFeatureExtractor"
+        ):
+            persistent = Path(tmp) / "persistent-cache"
+            with mock.patch.dict(
+                os.environ, {"RRCL_FEATURE_CACHE_ROOT": str(persistent)}
+            ):
+                domains = IQADomains([], backbone="toy", img_size=32)
+            self.assertEqual(
+                Path(domains.cache_dir), persistent / "iqa" / "toy_img32"
+            )
+            self.assertTrue(Path(domains.cache_dir).is_dir())
+
     def test_official_csv_derives_type_and_keeps_references_disjoint(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -57,11 +57,15 @@ class IQASpec:
 
 
 def build_iqa_config(cfg):
+    def expand_path(value):
+        return os.path.abspath(os.path.expandvars(os.path.expanduser(str(value))))
+
     out = []
     for d in cfg["domains"]:
         out.append(IQASpec(
-            name=d["name"], kind=d.get("kind", "csv"), root=d["root"],
-            csv=d.get("csv", ""), img_col=d.get("img_col", "image_name"),
+            name=d["name"], kind=d.get("kind", "csv"), root=expand_path(d["root"]),
+            csv=expand_path(d["csv"]) if d.get("csv") else "",
+            img_col=d.get("img_col", "image_name"),
             mos_col=d.get("mos_col", "MOS"),
             filter_col=d.get("filter_col", ""),
             filter_val=d.get("filter_val", ""),
@@ -171,15 +175,25 @@ class IQADomains:
     """Domain-incremental IQA: each domain = one IQA database or distortion family."""
 
     def __init__(self, specs: List[IQASpec], backbone="dinov2_vitb14",
-                 img_size=518, max_per_domain=None, sample_seed=42):
+                 img_size=518, max_per_domain=None, sample_seed=42,
+                 device=None, cache_dir=None):
         self.specs = list(specs)
         self.backbone = backbone
         self.img_size = int(img_size)
         self.max_per_domain = max_per_domain
         self.sample_seed = int(sample_seed)
-        self.cache_dir = os.path.join(".feature_cache_iqa", f"{backbone}_img{img_size}")
+        if cache_dir is None:
+            cache_root = os.environ.get("RRCL_FEATURE_CACHE_ROOT")
+            cache_dir = (
+                os.path.join(cache_root, "iqa", f"{backbone}_img{img_size}")
+                if cache_root
+                else os.path.join(".feature_cache_iqa", f"{backbone}_img{img_size}")
+            )
+        self.cache_dir = os.path.abspath(os.path.expanduser(cache_dir))
         os.makedirs(self.cache_dir, exist_ok=True)
-        self.extractor = DinoFeatureExtractor(backbone=backbone, img_size=img_size)
+        self.extractor = DinoFeatureExtractor(
+            backbone=backbone, img_size=img_size, device=device
+        )
         # pre-split all domains
         self._splits = {}
         for d, spec in enumerate(self.specs):

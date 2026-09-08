@@ -8,7 +8,15 @@ __pycache__/
 dist/
 build/
 .venv/
+.venv*/
 .pilot_artifacts/
+
+# Local credentials and machine-specific overrides
+.env
+.env.*
+!.env.example
+*.pem
+*.key
 
 # Feature / result caches (large, generated)
 .feature_cache*/
@@ -34,6 +42,7 @@ paper/*.synctex.gz
 paper/_minted*/
 output/pdf/
 tmp/pdfs/
+artifacts/
 
 # OS
 .DS_Store

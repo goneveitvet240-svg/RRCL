@@ -29,9 +29,13 @@ machine-specific paths; dataset and output locations are supplied at runtime.
 - Controlled study: `scripts/run_tmlr_synthetic_v1.py`.
 - FDST boundary: `scripts/preflight_fdst.py` and `scripts/run_fdst_c7.py`.
 - Held-out selector study: `scripts/run_tmlr_selector_v2.py`.
+- Post-freeze exploratory diagnostics: `scripts/history_dominance_phase.py`
+  and `scripts/explore_candidate_family.py`.
 
 Formal runners are guarded by frozen hashes and single-shot locks. Their
 validators are the normal public verification entry points.
+The exploratory diagnostics write to separate ignored directories and do not
+modify any frozen formal artifact.
 
 ## Protocols and results
 
@@ -47,6 +51,9 @@ validators are the normal public verification entry points.
 
 - `configs/`: frozen JSON configs and FDST split manifests.
 - `scripts/validate_*.py`: independent result recomputation and checks.
+- `scripts/setup_autodl.sh`: CUDA-safe dependency setup and repository tests.
+- `scripts/run_kadid_autodl.sh`: resumable KADID development run on AutoDL.
+- `scripts/package_autodl_results.sh`: validated-result export archive.
 - `tests/`: implementation and protocol regression tests.
 - `paper/figs/`: tables and figures bound to retained evidence.
 - `release/`: deterministic anonymous submission supplement and checksum.

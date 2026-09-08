@@ -4,11 +4,25 @@ import numpy as np
 import torch
 
 
+def resolve_device(device=None):
+    """Resolve an explicit/env device, then prefer CUDA, MPS, and CPU."""
+
+    requested = device or os.environ.get("RRCL_DEVICE")
+    if requested and requested != "auto":
+        return str(requested)
+    if torch.cuda.is_available():
+        return "cuda"
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return "mps"
+    return "cpu"
+
+
 class DinoFeatureExtractor:
     def __init__(self, backbone="dinov2_vitb14", img_size=518, device=None):
         self.backbone = backbone
         self.img_size = int(img_size)
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = resolve_device(device)
         try:
             import timm
         except ImportError as e:
@@ -49,4 +63,3 @@ class DinoFeatureExtractor:
 def cache_key(image_path, backbone, img_size):
     safe = os.path.abspath(image_path).replace(os.sep, "__").replace(":", "")
     return f"{backbone}_img{int(img_size)}_{safe}.npy"
-

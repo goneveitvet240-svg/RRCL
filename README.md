@@ -23,6 +23,8 @@ predeclared evidence roles:
 | Controlled synthetic study | Preregistered mechanism boundary | All 16 cells remain below the prespecified 0.5% scalar-grid opportunity threshold. |
 | FDST confirmation | Frozen single-shot external boundary | The fixed-factor Oracle selects `f=1`; no material scalar-grid opportunity is found. |
 | Held-out selector study | Preregistered learned-selector test | KNN has positive utility but passes only 3/4 composite criteria; matched SIFt-RLS and DOS-ELM-style results are retained. |
+| History-dominance diagnostic | Post-freeze exploratory analysis | The expected-risk closed form explains information rebalancing, while a conditional finite-sample Oracle also exposes selection-on-noise exceptions. |
+| Candidate-family diagnostic | Post-freeze exploratory analysis | A strictly nested, mean-normalized track separates scalar shape restrictions from the current-domain-maximum constraint. |
 
 These findings bound the tested scalar factor grids, selectors, and task
 distributions. They do not establish a universal impossibility result and do
@@ -83,6 +85,32 @@ python3 scripts/validate_tmlr_claim_set.py
 The formal runners enforce frozen configuration hashes, a clean Git worktree,
 and single-shot locks. Do not invoke a formal runner merely to test the code;
 use its documented `--testing` path or the test suite instead.
+
+### Fresh AutoDL GPU instance
+
+Choose an AutoDL image with CUDA-enabled PyTorch already installed, clone this
+repository below `/root/autodl-tmp`, and run:
+
+```bash
+bash scripts/setup_autodl.sh
+export RRCL_KADID_ROOT=/root/autodl-tmp/datasets/KADID10k/extracted/kadid10k
+bash scripts/run_kadid_autodl.sh
+bash scripts/package_autodl_results.sh
+```
+
+`RRCL_KADID_ROOT` must contain `images/` and `dmos.csv`. Generated datasets,
+features, and results are excluded from Git; copy the export archive off the
+instance before releasing it. See `docs/RRCL_LOCAL_KADID_RUNBOOK.md` for the
+smoke-test and resume procedure.
+
+The two post-freeze exploratory diagnostics are rerunnable but are not part of
+the frozen submission bundle:
+
+```bash
+python3 scripts/history_dominance_phase.py
+python3 scripts/explore_candidate_family.py
+python3 scripts/validate_exploratory_diagnostics.py
+```
 
 ## Data
 

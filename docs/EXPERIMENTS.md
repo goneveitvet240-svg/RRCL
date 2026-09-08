@@ -71,6 +71,27 @@ Protocol and result:
 - `RRCL_TMLR_SELECTOR_V2_PROTOCOL.md`
 - `RRCL_TMLR_SELECTOR_V2_RESULTS_2026-08-10.md`
 
+## 5. Post-freeze exploratory diagnostics
+
+Two deterministic diagnostics are kept outside the frozen claim-set bundle:
+
+```bash
+python3 scripts/history_dominance_phase.py
+python3 scripts/explore_candidate_family.py
+python3 scripts/validate_exploratory_diagnostics.py
+```
+
+The history-dominance study distinguishes the closed-form minimizer of risk
+averaged over training noise from a conditional finite-sample Oracle that
+selects after each realization. The latter may select on estimation noise even
+when mapping mismatch is zero.
+
+The candidate-family study reproduces the deployed scalar family, then uses a
+separate strictly nested, mean-normalized attribution track. This prevents
+constraint attribution from being confounded by changes in total weight and
+effective ridge scale. Both studies are exploratory, use population-risk
+Oracles, and define no deployable selector.
+
 ## Evidence rules
 
 - Diagnostic Oracles are not deployable methods.
