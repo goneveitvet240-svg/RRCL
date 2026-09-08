@@ -1,9 +1,9 @@
 """Pure NumPy primitives for the RRCL new-method baseline audit.
 
 The module deliberately contains no dataset loader and no test-set model
-selection.  It implements the three shared analytic objectives frozen in
-``configs/new_method_development_v1.json`` and train-side ridge selection on
-held-out, image-level fused quadratic statistics.
+selection.  It implements the shared analytic objectives used by the frozen
+development protocols and train-side ridge selection on held-out, image-level
+fused quadratic statistics.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import numpy as np
 
 
 METHOD_POOLED = "pooled_f1"
+METHOD_SAMPLE_MEAN_POOLED = "sample_mean_pooled"
 METHOD_DOMAIN_BALANCED = "domain_balanced"
 METHOD_DOMAIN_BALANCED_MASS_MATCHED = "domain_balanced_mass_matched"
 SHARED_METHODS = (
@@ -92,6 +93,8 @@ def objective_weights(observation_counts, method: str) -> np.ndarray:
         raise ValueError(f"observation counts must be finite and positive: {counts}")
     if method == METHOD_POOLED:
         return np.ones_like(counts)
+    if method == METHOD_SAMPLE_MEAN_POOLED:
+        return np.ones_like(counts) / counts.sum()
     if method == METHOD_DOMAIN_BALANCED:
         return 1.0 / (counts.size * counts)
     if method == METHOD_DOMAIN_BALANCED_MASS_MATCHED:

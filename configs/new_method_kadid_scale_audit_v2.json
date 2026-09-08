@@ -1,0 +1,54 @@
+{
+  "protocol_id": "rrcl-new-method-kadid-scale-audit-v2",
+  "status": "development-only",
+  "created_date": "2026-09-08",
+  "motivation": "Separate domain weighting from the global data-term scale exposed by KADID development-v1.",
+  "domain_config_basename": "domains_iqa_kadid.json",
+  "forbidden_dataset_tokens": ["fdst"],
+  "expected_domains": [
+    "KADID-Noise",
+    "KADID-Blur",
+    "KADID-Color",
+    "KADID-Compression",
+    "KADID-Spatial"
+  ],
+  "backbone": "vit_base_patch14_dinov2.lvd142m",
+  "image_size": 518,
+  "max_train_per_domain": 500,
+  "test_policy": "all_reference-disjoint_test_images",
+  "sample_seed": 42,
+  "selector_split_seed": 42,
+  "selector_val_every": 5,
+  "selector_split_unit": "reference_content_group",
+  "lambda_grid": {
+    "kind": "log10",
+    "minimum_exponent": -5.0,
+    "maximum_exponent": 4.0,
+    "points": 37
+  },
+  "lambda_selection_objective": "balanced_domain_mean_unclipped_normalized_mse",
+  "downstream_metric": "balanced_domain_mean_clipped_relative_mae",
+  "target_normalization": "fit_partition_domain_mean",
+  "primary_training_protocol": "aligned_fit_only",
+  "normalized_objectives": {
+    "sample_mean_pooled": "w_j = 1 / sum_k(n_k)",
+    "domain_balanced": "w_j = 1 / (t n_j)"
+  },
+  "raw_equivalence": {
+    "sample_mean_pooled": "pooled_f1 at lambda_raw = N_t * lambda_normalized",
+    "domain_balanced": "domain_balanced_mass_matched at lambda_raw = N_t * lambda_normalized"
+  },
+  "lambda_tie_break": "larger_lambda",
+  "equivalence_relative_tolerance": 1e-7,
+  "output_root": "runs_real/new_method_kadid_scale_audit_v2",
+  "prior_batch_artifact": "runs_real/new_method_kadid_development_v1/main/kadid_baseline_audit.json",
+  "notes": [
+    "The same normalized lambda grid is used for both objectives.",
+    "The grid and all comparisons were frozen before the v2 natural-data result was inspected.",
+    "Same-lambda paired comparisons isolate domain weighting at fixed normalized regularization.",
+    "Raw-equivalent systems are an algebraic implementation audit, not additional model candidates.",
+    "KADID is reused development data and cannot provide independent confirmation.",
+    "FDST is forbidden.",
+    "No projection, independent-head, candidate-bank, shrinkage, or automatic-f experiment is rerun in this batch."
+  ]
+}

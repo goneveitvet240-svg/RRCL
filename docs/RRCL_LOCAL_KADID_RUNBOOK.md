@@ -71,6 +71,23 @@ python3 scripts/validate_new_method_kadid_baselines.py \
 The primary result is `aligned_fit_only`; `full_refit_ablation` is separately
 labelled and is not certified by the fit-only validation objective.
 
+## Scale-equivalence audit v2
+
+After the first-batch result exposed a global regularization-scale confound,
+run the frozen normalized-objective follow-up with the same feature cache:
+
+```bash
+python3 scripts/run_kadid_scale_audit_v2.py
+python3 scripts/validate_kadid_scale_audit_v2.py \
+  runs_real/new_method_kadid_scale_audit_v2/main/kadid_scale_audit_v2.json
+```
+
+The v2 protocol compares sample-mean pooled and domain-mean balanced
+objectives with total observation weight one and the same 37-point normalized
+lambda grid. It also verifies the corresponding raw-scale solution at every
+domain boundary. It does not rerun the projection or independent-head
+baselines and does not yet test a candidate trajectory bank or automatic `f`.
+
 After moving an artifact to another machine, the validator falls back to the
 tracked domain config with the recorded basename and still requires its
 SHA-256 to match. A relocated config can also be supplied explicitly:
@@ -99,6 +116,10 @@ bash scripts/setup_autodl.sh
 export RRCL_KADID_ROOT=/root/autodl-tmp/datasets/KADID10k/extracted/kadid10k
 bash scripts/run_kadid_autodl.sh
 bash scripts/package_autodl_results.sh
+
+# Follow-up scale audit, reusing the completed feature cache
+bash scripts/run_kadid_scale_audit_v2.sh
+bash scripts/package_kadid_scale_audit_v2.sh
 ```
 
 The setup script deliberately keeps the CUDA-enabled PyTorch supplied by the
