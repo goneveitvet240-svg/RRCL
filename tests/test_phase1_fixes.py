@@ -14,6 +14,7 @@ import math
 import os
 import tempfile
 import unittest
+import warnings
 
 import numpy as np
 
@@ -172,16 +173,15 @@ class TestContinuousMode(unittest.TestCase):
 class TestNumpyScalarSafety(unittest.TestCase):
     """No np.float64 2D array passed to float()."""
 
-    def test_float_on_2d_array_fails(self):
-        """Verify that float(np.array([[1.0]])) raises TypeError on numpy 2.x."""
-        # This is the pattern we must avoid
+    def test_scalar_extraction_is_explicit_and_version_independent(self):
+        """Treat NumPy's warning and later TypeError as the same unsafe pattern."""
         arr = np.array([[1.0]])
-        if hasattr(np, '__version__') and np.__version__.startswith('2'):
-            with self.assertRaises(TypeError):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            with self.assertRaises((DeprecationWarning, TypeError)):
                 float(arr)
-        # Safe pattern: float(np.sum(arr)) or arr.item()
-        safe = float(np.sum(np.array([[3.0]])))
-        self.assertEqual(safe, 3.0)
+        self.assertEqual(float(arr.reshape(-1)[0]), 1.0)
+        self.assertEqual(arr.item(), 1.0)
 
 
 # ======================================================================
