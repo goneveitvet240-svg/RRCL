@@ -5,6 +5,8 @@
 > roles. All 46 validation reference groups appeared in another domain's fit
 > role. The numbers below are preserved for traceability only and are
 > superseded by the leakage-corrected v3 rerun.
+> The corrected result is documented in
+> `docs/RRCL_KADID_SCALE_AUDIT_V3_RESULTS_2026-09-08.md`.
 
 Formal run date: 2026-09-08 (Asia/Shanghai)
 
