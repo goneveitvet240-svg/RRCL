@@ -1,5 +1,11 @@
 # RRCL KADID scale-equivalence audit v2 result
 
+> **INVALIDATED / 不可作为结果使用（2026-09-08）:** a post-run audit found
+> cross-domain reference-content leakage between fit and selector-validation
+> roles. All 46 validation reference groups appeared in another domain's fit
+> role. The numbers below are preserved for traceability only and are
+> superseded by the leakage-corrected v3 rerun.
+
 Formal run date: 2026-09-08 (Asia/Shanghai)
 
 Pre-result freeze commit: `dc2b4a8fe7e42433cc7268b2767deac0fe6e96ae`

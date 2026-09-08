@@ -73,6 +73,10 @@ labelled and is not certified by the fit-only validation objective.
 
 ## Scale-equivalence audit v2
 
+> V2 is retained only as an invalidated audit trail. Its selector split was
+> domain-specific and leaked reference content across fit/validation roles.
+> Use v3 below for any current result.
+
 After the first-batch result exposed a global regularization-scale confound,
 run the frozen normalized-objective follow-up with the same feature cache:
 
@@ -87,6 +91,20 @@ objectives with total observation weight one and the same 37-point normalized
 lambda grid. It also verifies the corresponding raw-scale solution at every
 domain boundary. It does not rerun the projection or independent-head
 baselines and does not yet test a candidate trajectory bank or automatic `f`.
+
+## Leakage-corrected scale audit v3
+
+V3 uses one shared reference-content hash key across every KADID distortion
+family and records the literal group-role lists for independent validation:
+
+```bash
+python3 scripts/run_kadid_scale_audit_v2.py \
+  --protocol-config configs/new_method_kadid_scale_audit_v3.json \
+  --out runs_real/new_method_kadid_scale_audit_v3/main
+python3 scripts/validate_kadid_scale_audit_v2.py \
+  runs_real/new_method_kadid_scale_audit_v3/main/kadid_scale_audit_v3.json \
+  --protocol-config configs/new_method_kadid_scale_audit_v3.json
+```
 
 After moving an artifact to another machine, the validator falls back to the
 tracked domain config with the recorded basename and still requires its
@@ -120,6 +138,10 @@ bash scripts/package_autodl_results.sh
 # Follow-up scale audit, reusing the completed feature cache
 bash scripts/run_kadid_scale_audit_v2.sh
 bash scripts/package_kadid_scale_audit_v2.sh
+
+# Required leakage-corrected replacement
+bash scripts/run_kadid_scale_audit_v3.sh
+bash scripts/package_kadid_scale_audit_v3.sh
 ```
 
 The setup script deliberately keeps the CUDA-enabled PyTorch supplied by the

@@ -17,6 +17,9 @@ EXPECTED_SHARED = {
     "domain_balanced",
     "domain_balanced_mass_matched",
 }
+INVALIDATION_REASON = (
+    "cross-domain reference-content leakage between fit and validation roles"
+)
 
 
 def _require(condition, message):
@@ -28,10 +31,14 @@ def _finite(value, where):
     _require(isinstance(value, (int, float)) and math.isfinite(value), f"{where} is not finite")
 
 
-def validate_payload(payload):
+def validate_payload(payload, *, allow_invalidated=False):
     _require(
         payload.get("protocol_id") == "rrcl-new-method-kadid-development-v1",
         "wrong protocol id",
+    )
+    _require(
+        allow_invalidated,
+        f"invalidated protocol: {INVALIDATION_REASON}",
     )
     _require(payload.get("evidence_role") == "development-only", "wrong evidence role")
     _require(payload.get("confirmation_data_used") is False, "confirmation flag must be false")
@@ -122,9 +129,11 @@ def validate_file(
     path,
     protocol_path=DEFAULT_PROTOCOL,
     domain_config_path=None,
+    *,
+    allow_invalidated=False,
 ):
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    validate_payload(payload)
+    validate_payload(payload, allow_invalidated=allow_invalidated)
     protocol_path = Path(protocol_path)
     protocol_bytes = protocol_path.read_bytes()
     provenance = payload.get("_provenance", {})
@@ -163,8 +172,18 @@ def main():
         "--domain-config",
         help="relocated domain config; its basename and SHA-256 must match the artifact",
     )
+    parser.add_argument(
+        "--allow-invalidated-audit-trail",
+        action="store_true",
+        help="check historical file integrity even though its evidence protocol is invalid",
+    )
     args = parser.parse_args()
-    validate_file(args.path, args.protocol_config, args.domain_config)
+    validate_file(
+        args.path,
+        args.protocol_config,
+        args.domain_config,
+        allow_invalidated=args.allow_invalidated_audit_trail,
+    )
     print(f"VALID: {args.path}")
 
 

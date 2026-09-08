@@ -7,18 +7,21 @@ import argparse
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from holdout_split import is_validation  # noqa: E402
+
+
 DEFAULT_PROTOCOL = ROOT / "configs" / "new_method_kadid_scale_audit_v2.json"
 EXPECTED_METHODS = {"sample_mean_pooled", "domain_balanced"}
-EXPECTED_SCOPE = {
-    "projection_and_independent_heads": "retained_from_batch1_not_rerun",
-    "fixed_trajectory_bank": "not_measured_in_batch2",
-    "risk_controlled_hard_selection": "not_measured_in_batch2",
-    "analytic_shrinkage": "not_measured_in_batch2",
-    "automatic_f": "not_measured_in_batch2",
+INVALIDATED_PROTOCOLS = {
+    "rrcl-new-method-kadid-scale-audit-v2": (
+        "cross-domain reference-content leakage between fit and validation roles"
+    )
 }
 
 
@@ -34,6 +37,14 @@ def _finite(value, where):
     )
 
 
+def _ids_manifest(values):
+    values = sorted(str(value) for value in values)
+    return {
+        "count": len(values),
+        "ids_sha256": hashlib.sha256("\n".join(values).encode("utf-8")).hexdigest(),
+    }
+
+
 def _resolve_domain_config(recorded_path, protocol, explicit_path=None):
     if explicit_path is not None:
         candidate = Path(explicit_path).expanduser()
@@ -47,9 +58,14 @@ def _resolve_domain_config(recorded_path, protocol, explicit_path=None):
     return fallback
 
 
-def validate_payload(payload, protocol=None):
+def validate_payload(payload, protocol=None, *, allow_invalidated=False):
     protocol = protocol or json.loads(DEFAULT_PROTOCOL.read_text(encoding="utf-8"))
     _require(payload.get("protocol_id") == protocol["protocol_id"], "wrong protocol id")
+    invalidation = INVALIDATED_PROTOCOLS.get(payload.get("protocol_id"))
+    _require(
+        allow_invalidated or invalidation is None,
+        f"invalidated protocol: {invalidation}",
+    )
     _require(payload.get("evidence_role") == "development-only", "wrong evidence role")
     _require(payload.get("confirmation_data_used") is False, "confirmation flag must be false")
     _require("fdst" not in json.dumps(payload.get("data_manifest", {})).lower(), "FDST contamination")
@@ -63,6 +79,40 @@ def validate_payload(payload, protocol=None):
         _require(manifest.get("unit") == "reference_content_group", f"domain {index}: wrong split unit")
         _require(manifest.get("fit_groups", {}).get("count", 0) > 0, f"domain {index}: empty fit groups")
         _require(manifest.get("validation_groups", {}).get("count", 0) > 0, f"domain {index}: empty validation groups")
+
+    selector_sample_key = protocol.get("selector_sample_key")
+    if selector_sample_key is not None:
+        audit = payload.get("selector_isolation_audit", {})
+        _require(audit.get("scope") == "global_across_domains", "selector split is not global")
+        _require(audit.get("selector_sample_key") == selector_sample_key, "selector sample key mismatch")
+        _require(audit.get("cross_role_overlap_count") == 0, "cross-domain fit/validation leakage")
+        domain_roles = audit.get("domains", [])
+        _require(len(domain_roles) == len(records), "selector domain-role audit missing")
+        global_fit, global_validation = set(), set()
+        for index, (record, roles) in enumerate(zip(records, domain_roles)):
+            _require(roles.get("name") == record.get("name"), f"domain {index}: role name mismatch")
+            fit = set(roles.get("fit_groups", []))
+            validation = set(roles.get("validation_groups", []))
+            _require(fit and validation and not (fit & validation), f"domain {index}: invalid role groups")
+            split = record["split_manifest"]
+            _require(split.get("selector_sample_key") == selector_sample_key, f"domain {index}: wrong selector key")
+            _require(split.get("scope") == "global_across_domains", f"domain {index}: wrong selector scope")
+            _require(_ids_manifest(fit) == split["fit_groups"], f"domain {index}: fit manifest mismatch")
+            _require(_ids_manifest(validation) == split["validation_groups"], f"domain {index}: validation manifest mismatch")
+            for group in fit:
+                _require(not is_validation(selector_sample_key, group, protocol["selector_split_seed"], protocol["selector_val_every"]), f"domain {index}: forged fit role")
+            for group in validation:
+                _require(is_validation(selector_sample_key, group, protocol["selector_split_seed"], protocol["selector_val_every"]), f"domain {index}: forged validation role")
+            global_fit.update(fit)
+            global_validation.update(validation)
+        _require(not (global_fit & global_validation), "recomputed cross-domain role overlap")
+        _require(_ids_manifest(global_fit) == audit["global_fit_groups"], "global fit manifest mismatch")
+        _require(_ids_manifest(global_validation) == audit["global_validation_groups"], "global validation manifest mismatch")
+        _require(
+            audit.get("cross_role_overlap_ids_sha256")
+            == _ids_manifest(global_fit & global_validation)["ids_sha256"],
+            "cross-role overlap hash mismatch",
+        )
 
     grid = payload.get("lambda_grid", [])
     _require(len(grid) == int(protocol["lambda_grid"]["points"]), "lambda grid length mismatch")
@@ -120,16 +170,33 @@ def validate_payload(payload, protocol=None):
         "domain_balance_gain_vs_sample_mean_pooled",
     ):
         _finite(practical.get(key), f"practical/{key}")
-    _require(payload.get("scope_status") == EXPECTED_SCOPE, "later-stage scope was changed or omitted")
+    batch_label = protocol.get("scope_batch_label", "batch2")
+    expected_scope = {
+        "projection_and_independent_heads": protocol.get(
+            "projection_and_independent_heads_status",
+            "retained_from_batch1_not_rerun",
+        ),
+        "fixed_trajectory_bank": f"not_measured_in_{batch_label}",
+        "risk_controlled_hard_selection": f"not_measured_in_{batch_label}",
+        "analytic_shrinkage": f"not_measured_in_{batch_label}",
+        "automatic_f": f"not_measured_in_{batch_label}",
+    }
+    _require(payload.get("scope_status") == expected_scope, "later-stage scope was changed or omitted")
     return True
 
 
-def validate_file(path, protocol_path=DEFAULT_PROTOCOL, domain_config_path=None):
+def validate_file(
+    path,
+    protocol_path=DEFAULT_PROTOCOL,
+    domain_config_path=None,
+    *,
+    allow_invalidated=False,
+):
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     protocol_path = Path(protocol_path)
     protocol_bytes = protocol_path.read_bytes()
     protocol = json.loads(protocol_bytes)
-    validate_payload(payload, protocol)
+    validate_payload(payload, protocol, allow_invalidated=allow_invalidated)
     provenance = payload.get("_provenance", {})
     _require(provenance.get("config_sha256") == hashlib.sha256(protocol_bytes).hexdigest(), "protocol hash mismatch")
     _require(provenance.get("config_snapshot") == protocol, "protocol snapshot mismatch")
@@ -148,8 +215,18 @@ def main():
     parser.add_argument("path")
     parser.add_argument("--protocol-config", default=str(DEFAULT_PROTOCOL))
     parser.add_argument("--domain-config")
+    parser.add_argument(
+        "--allow-invalidated-audit-trail",
+        action="store_true",
+        help="check historical file integrity even though its evidence protocol is invalid",
+    )
     args = parser.parse_args()
-    validate_file(args.path, args.protocol_config, args.domain_config)
+    validate_file(
+        args.path,
+        args.protocol_config,
+        args.domain_config,
+        allow_invalidated=args.allow_invalidated_audit_trail,
+    )
     print(f"VALID: {args.path}")
 
 

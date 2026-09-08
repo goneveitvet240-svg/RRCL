@@ -132,16 +132,19 @@ def _domain_name(domains, index):
     return f"domain-{index}"
 
 
-def collect_domain_records(domains, split_seed, val_every):
+def collect_domain_records(
+    domains, split_seed, val_every, selector_sample_key=None
+):
     records = []
     dimension = None
     for index in range(domains.n_domains()):
         name = _domain_name(domains, index)
+        split_key = str(selector_sample_key or name)
         fit_groups, validation_groups = set(), set()
         fit_targets = []
         for _, target, group in domains.stream("train", index):
             group = str(group)
-            if is_validation(name, group, split_seed, val_every):
+            if is_validation(split_key, group, split_seed, val_every):
                 validation_groups.add(group)
             else:
                 fit_groups.add(group)
@@ -185,6 +188,12 @@ def collect_domain_records(domains, split_seed, val_every):
                 "val": validation,
                 "split_manifest": {
                     "unit": "reference_content_group",
+                    "selector_sample_key": split_key,
+                    "scope": (
+                        "global_across_domains"
+                        if selector_sample_key is not None
+                        else "domain_specific"
+                    ),
                     "split_seed": int(split_seed),
                     "val_every": int(val_every),
                     "fit_groups": identifiers_manifest(fit_groups),
@@ -192,6 +201,8 @@ def collect_domain_records(domains, split_seed, val_every):
                     "fit_samples": fit_samples,
                     "validation_samples": validation_samples,
                 },
+                "_fit_groups": fit_groups,
+                "_validation_groups": validation_groups,
             }
         )
     return records, int(dimension)

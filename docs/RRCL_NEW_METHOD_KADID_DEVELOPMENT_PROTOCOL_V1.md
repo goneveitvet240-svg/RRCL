@@ -1,5 +1,12 @@
 # RRCL KADID new-method development protocol v1
 
+> **Invalidated on 2026-09-08:** the implementation hashed the selector split
+> with `(domain_name, reference_id)`, so the same pristine reference content
+> could be fit data in one distortion family and validation data in another.
+> Train/test isolation was intact, but cross-domain fit/validation isolation
+> was not. Numerical results produced under v1 are retained only as an audit
+> trail and must not be used as paper evidence. See the corrected v3 protocol.
+
 Status: **development-only（仅开发）**
 Protocol id: `rrcl-new-method-kadid-development-v1`
 Frozen draft date: 2026-09-08

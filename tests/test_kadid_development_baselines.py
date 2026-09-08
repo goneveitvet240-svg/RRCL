@@ -102,7 +102,9 @@ class KADIDDevelopmentProtocolTest(unittest.TestCase):
             self.assertGreater(
                 record["split_manifest"]["validation_groups"]["count"], 0
             )
-        self.assertTrue(VALIDATOR.validate_payload(payload))
+        self.assertTrue(VALIDATOR.validate_payload(payload, allow_invalidated=True))
+        with self.assertRaisesRegex(AssertionError, "invalidated protocol"):
+            VALIDATOR.validate_payload(payload)
 
     def test_validator_accepts_relocated_domain_config_with_matching_hash(self):
         protocol_path = ROOT / "configs" / "new_method_kadid_development_v1.json"
@@ -143,6 +145,7 @@ class KADIDDevelopmentProtocolTest(unittest.TestCase):
                     result_path,
                     protocol_path,
                     domain_path,
+                    allow_invalidated=True,
                 )
             )
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
@@ -79,6 +80,8 @@ def require_frozen_arguments(arguments, protocol):
         "val_every": int(protocol["selector_val_every"]),
         "lambdas": protocol_lambda_grid(protocol),
     }
+    if "selector_sample_key" in protocol:
+        expected["selector_sample_key"] = protocol["selector_sample_key"]
     differences = {
         key: {"expected": value, "actual": getattr(arguments, key)}
         for key, value in expected.items()
@@ -251,7 +254,10 @@ def run_same_lambda_pairs(domains, records, methods):
 
 def run_audit(domains, protocol, arguments, data_manifest, runtime):
     records, dimension = collect_domain_records(
-        domains, arguments.split_seed, arguments.val_every
+        domains,
+        arguments.split_seed,
+        arguments.val_every,
+        getattr(arguments, "selector_sample_key", None),
     )
     methods = {
         method: run_normalized_method(domains, records, method, arguments.lambdas)
@@ -263,6 +269,12 @@ def run_audit(domains, protocol, arguments, data_manifest, runtime):
     balanced_loss = methods[METHOD_DOMAIN_BALANCED]["aligned_fit_only"][
         "relative_mae"
     ]["final_balanced_loss"]
+    fit_groups = set().union(*(record["_fit_groups"] for record in records))
+    validation_groups = set().union(
+        *(record["_validation_groups"] for record in records)
+    )
+    cross_role_overlap = fit_groups & validation_groups
+    batch_label = protocol.get("scope_batch_label", "batch2")
     return {
         "protocol_id": protocol["protocol_id"],
         "evidence_role": "development-only",
@@ -281,6 +293,38 @@ def run_audit(domains, protocol, arguments, data_manifest, runtime):
         },
         "data_manifest": data_manifest,
         "domain_records": _serializable_records(records),
+        "selector_isolation_audit": {
+            "selector_sample_key": getattr(arguments, "selector_sample_key", None),
+            "scope": (
+                "global_across_domains"
+                if getattr(arguments, "selector_sample_key", None) is not None
+                else "domain_specific"
+            ),
+            "global_fit_groups": {
+                "count": len(fit_groups),
+                "ids_sha256": hashlib.sha256(
+                    "\n".join(sorted(fit_groups)).encode("utf-8")
+                ).hexdigest(),
+            },
+            "global_validation_groups": {
+                "count": len(validation_groups),
+                "ids_sha256": hashlib.sha256(
+                    "\n".join(sorted(validation_groups)).encode("utf-8")
+                ).hexdigest(),
+            },
+            "cross_role_overlap_count": len(cross_role_overlap),
+            "cross_role_overlap_ids_sha256": hashlib.sha256(
+                "\n".join(sorted(cross_role_overlap)).encode("utf-8")
+            ).hexdigest(),
+            "domains": [
+                {
+                    "name": record["name"],
+                    "fit_groups": sorted(record["_fit_groups"]),
+                    "validation_groups": sorted(record["_validation_groups"]),
+                }
+                for record in records
+            ],
+        },
         "lambda_grid": arguments.lambdas,
         "normalized_methods": methods,
         "same_lambda_pairs": run_same_lambda_pairs(domains, records, methods),
@@ -293,11 +337,14 @@ def run_audit(domains, protocol, arguments, data_manifest, runtime):
             "selection_source": "fit models selected by validation only",
         },
         "scope_status": {
-            "projection_and_independent_heads": "retained_from_batch1_not_rerun",
-            "fixed_trajectory_bank": "not_measured_in_batch2",
-            "risk_controlled_hard_selection": "not_measured_in_batch2",
-            "analytic_shrinkage": "not_measured_in_batch2",
-            "automatic_f": "not_measured_in_batch2",
+            "projection_and_independent_heads": protocol.get(
+                "projection_and_independent_heads_status",
+                "retained_from_batch1_not_rerun",
+            ),
+            "fixed_trajectory_bank": f"not_measured_in_{batch_label}",
+            "risk_controlled_hard_selection": f"not_measured_in_{batch_label}",
+            "analytic_shrinkage": f"not_measured_in_{batch_label}",
+            "automatic_f": f"not_measured_in_{batch_label}",
         },
     }
 
@@ -344,6 +391,7 @@ def main():
         else args.split_seed
     )
     args.val_every = args.val_every or int(protocol["selector_val_every"])
+    args.selector_sample_key = protocol.get("selector_sample_key")
     args.lambdas = (
         [float(value) for value in args.lambdas.split(",")]
         if args.lambdas
@@ -380,7 +428,9 @@ def main():
     payload["elapsed_seconds"] = time.time() - started
     payload["selftest"] = bool(args.selftest)
     result = with_provenance(payload, args.protocol_config, vars(args))
-    destination = output / "kadid_scale_audit_v2.json"
+    destination = output / protocol.get(
+        "result_filename", "kadid_scale_audit_v2.json"
+    )
     dump_result(destination, result)
     print(json.dumps(payload["practical_comparison"], indent=2))
     print(f"saved -> {destination}")

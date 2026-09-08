@@ -1,5 +1,11 @@
 # RRCL KADID scale-equivalence audit v2
 
+> **Invalidated on 2026-09-08:** v2 inherited v1's domain-specific selector
+> hash key. All 46 reference groups used for validation in at least one domain
+> also appeared in the fit partition of another domain. The algebraic scale
+> identity remains correct, but the measured validation selections and test
+> comparisons are not valid paper evidence. See the corrected v3 protocol.
+
 Status: **development-only（仅开发）**
 
 Protocol id: `rrcl-new-method-kadid-scale-audit-v2`

@@ -1,4 +1,5 @@
 import importlib.util
+import copy
 import json
 import math
 import tempfile
@@ -84,7 +85,13 @@ class KADIDScaleAuditV2Test(unittest.TestCase):
                 audit = selection["equivalence_audit"]
                 self.assertLess(audit["weights_relative_l2"], 1e-9)
                 self.assertLess(audit["validation_risk_absolute_difference"], 1e-9)
-        self.assertTrue(VALIDATOR.validate_payload(payload, self.protocol))
+        self.assertTrue(
+            VALIDATOR.validate_payload(
+                payload, self.protocol, allow_invalidated=True
+            )
+        )
+        with self.assertRaisesRegex(AssertionError, "invalidated protocol"):
+            VALIDATOR.validate_payload(payload, self.protocol)
 
     def test_cli_selftest_artifact_validates(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -116,7 +123,85 @@ class KADIDScaleAuditV2Test(unittest.TestCase):
             output.mkdir(parents=True)
             result = output / "kadid_scale_audit_v2.json"
             result.write_text(json.dumps(payload))
-            self.assertTrue(VALIDATOR.validate_file(result, self.protocol_path))
+            self.assertTrue(
+                VALIDATOR.validate_file(
+                    result, self.protocol_path, allow_invalidated=True
+                )
+            )
+
+
+class KADIDScaleAuditV3IsolationTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.protocol = json.loads(
+            (ROOT / "configs" / "new_method_kadid_scale_audit_v3.json").read_text()
+        )
+
+    def _payload(self):
+        args = SimpleNamespace(
+            domain_config=None,
+            split_seed=self.protocol["selector_split_seed"],
+            val_every=self.protocol["selector_val_every"],
+            selector_sample_key=self.protocol["selector_sample_key"],
+            lambdas=RUNNER.protocol_lambda_grid(self.protocol),
+        )
+        domains = RUNNER._ToyScalarDomains()
+        return RUNNER.run_audit(
+            domains,
+            self.protocol,
+            args,
+            domains.data_manifest(),
+            {"device": "none-toy", "cache_dir": None},
+        )
+
+    def test_shared_selector_key_eliminates_cross_domain_role_overlap(self):
+        payload = self._payload()
+        audit = payload["selector_isolation_audit"]
+        self.assertEqual(audit["scope"], "global_across_domains")
+        self.assertEqual(audit["cross_role_overlap_count"], 0)
+        role_by_group = {}
+        for domain in audit["domains"]:
+            for role in ("fit_groups", "validation_groups"):
+                for group in domain[role]:
+                    role_by_group.setdefault(group, set()).add(role)
+        self.assertTrue(role_by_group)
+        self.assertTrue(all(len(roles) == 1 for roles in role_by_group.values()))
+        self.assertTrue(VALIDATOR.validate_payload(payload, self.protocol))
+
+    def test_domain_specific_selector_key_reproduces_cross_domain_leakage(self):
+        domains = RUNNER._ToyScalarDomains()
+        old_records, _ = RUNNER.collect_domain_records(domains, 42, 5)
+        old_fit = set().union(*(record["_fit_groups"] for record in old_records))
+        old_validation = set().union(
+            *(record["_validation_groups"] for record in old_records)
+        )
+        self.assertTrue(old_fit & old_validation)
+
+        corrected_records, _ = RUNNER.collect_domain_records(
+            domains, 42, 5, self.protocol["selector_sample_key"]
+        )
+        corrected_fit = set().union(
+            *(record["_fit_groups"] for record in corrected_records)
+        )
+        corrected_validation = set().union(
+            *(record["_validation_groups"] for record in corrected_records)
+        )
+        self.assertFalse(corrected_fit & corrected_validation)
+
+    def test_validator_rejects_forged_positive_isolation_field(self):
+        payload = self._payload()
+        forged = copy.deepcopy(payload)
+        validation_group = forged["selector_isolation_audit"]["domains"][0][
+            "validation_groups"
+        ][0]
+        forged["selector_isolation_audit"]["domains"][1]["fit_groups"].append(
+            validation_group
+        )
+        forged["selector_isolation_audit"]["cross_role_overlap_count"] = 0
+        with self.assertRaisesRegex(
+            AssertionError, "invalid role groups|manifest mismatch|forged fit role|overlap"
+        ):
+            VALIDATOR.validate_payload(forged, self.protocol)
 
 
 if __name__ == "__main__":
