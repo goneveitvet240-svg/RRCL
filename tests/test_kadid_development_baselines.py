@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 import tempfile
@@ -102,6 +103,48 @@ class KADIDDevelopmentProtocolTest(unittest.TestCase):
                 record["split_manifest"]["validation_groups"]["count"], 0
             )
         self.assertTrue(VALIDATOR.validate_payload(payload))
+
+    def test_validator_accepts_relocated_domain_config_with_matching_hash(self):
+        protocol_path = ROOT / "configs" / "new_method_kadid_development_v1.json"
+        domain_path = ROOT / "configs" / "domains_iqa_kadid.json"
+        args = SimpleNamespace(
+            domain_config=None,
+            split_seed=42,
+            val_every=5,
+            reference_lambda=100.0,
+            lambdas=[0.1, 1.0, 10.0],
+            skip_projection=False,
+            projection_dim=8,
+            projection_seed=0,
+        )
+        domains = RUNNER._ToyScalarDomains()
+        payload = RUNNER.run_audit(
+            domains,
+            self.protocol,
+            args,
+            domains.data_manifest(),
+            {"device": "none-toy", "cache_dir": None},
+        )
+        protocol_bytes = protocol_path.read_bytes()
+        payload["selftest"] = False
+        payload["domain_config"] = {
+            "path": "/released/server/path/domains_iqa_kadid.json",
+            "sha256": hashlib.sha256(domain_path.read_bytes()).hexdigest(),
+        }
+        payload["_provenance"] = {
+            "config_sha256": hashlib.sha256(protocol_bytes).hexdigest(),
+            "config_snapshot": json.loads(protocol_bytes),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            result_path = Path(tmp) / "result.json"
+            result_path.write_text(json.dumps(payload))
+            self.assertTrue(
+                VALIDATOR.validate_file(
+                    result_path,
+                    protocol_path,
+                    domain_path,
+                )
+            )
 
 
 if __name__ == "__main__":

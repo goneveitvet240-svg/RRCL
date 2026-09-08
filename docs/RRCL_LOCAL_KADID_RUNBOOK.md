@@ -71,6 +71,15 @@ python3 scripts/validate_new_method_kadid_baselines.py \
 The primary result is `aligned_fit_only`; `full_refit_ablation` is separately
 labelled and is not certified by the fit-only validation objective.
 
+After moving an artifact to another machine, the validator falls back to the
+tracked domain config with the recorded basename and still requires its
+SHA-256 to match. A relocated config can also be supplied explicitly:
+
+```bash
+python3 scripts/validate_new_method_kadid_baselines.py /path/to/kadid_baseline_audit.json \
+  --domain-config configs/domains_iqa_kadid.json
+```
+
 ## Future GPU migration
 
 Use `RRCL_FEATURE_CACHE_ROOT` on persistent storage rather than the instance's

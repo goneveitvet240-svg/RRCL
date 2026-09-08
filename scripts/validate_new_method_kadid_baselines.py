@@ -98,7 +98,31 @@ def validate_payload(payload):
     return True
 
 
-def validate_file(path, protocol_path=DEFAULT_PROTOCOL):
+def _resolve_domain_config(recorded_path, protocol, explicit_path=None):
+    if explicit_path is not None:
+        candidate = Path(explicit_path).expanduser()
+        _require(candidate.is_file(), f"explicit domain config missing: {candidate}")
+        return candidate
+
+    recorded = Path(recorded_path).expanduser() if recorded_path else None
+    if recorded is not None and recorded.is_file():
+        return recorded
+
+    basename = protocol.get("domain_config_basename")
+    _require(bool(basename), "protocol domain config basename missing")
+    fallback = ROOT / "configs" / basename
+    _require(
+        fallback.is_file(),
+        f"domain config missing at recorded path and repository fallback: {fallback}",
+    )
+    return fallback
+
+
+def validate_file(
+    path,
+    protocol_path=DEFAULT_PROTOCOL,
+    domain_config_path=None,
+):
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     validate_payload(payload)
     protocol_path = Path(protocol_path)
@@ -114,9 +138,20 @@ def validate_file(path, protocol_path=DEFAULT_PROTOCOL):
     )
     if not payload.get("selftest"):
         domain_config = payload.get("domain_config", {})
-        domain_path = Path(domain_config.get("path", ""))
-        _require(domain_path.is_file(), "domain config missing")
-        _require(domain_config.get("sha256") == hashlib.sha256(domain_path.read_bytes()).hexdigest(), "domain config hash mismatch")
+        domain_path = _resolve_domain_config(
+            domain_config.get("path"),
+            json.loads(protocol_bytes),
+            domain_config_path,
+        )
+        _require(
+            domain_path.name == json.loads(protocol_bytes)["domain_config_basename"],
+            "domain config basename mismatch",
+        )
+        _require(
+            domain_config.get("sha256")
+            == hashlib.sha256(domain_path.read_bytes()).hexdigest(),
+            "domain config hash mismatch",
+        )
     return True
 
 
@@ -124,8 +159,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("path")
     parser.add_argument("--protocol-config", default=str(DEFAULT_PROTOCOL))
+    parser.add_argument(
+        "--domain-config",
+        help="relocated domain config; its basename and SHA-256 must match the artifact",
+    )
     args = parser.parse_args()
-    validate_file(args.path, args.protocol_config)
+    validate_file(args.path, args.protocol_config, args.domain_config)
     print(f"VALID: {args.path}")
 
 
